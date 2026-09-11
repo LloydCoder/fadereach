@@ -1,0 +1,148 @@
+"""FadeReach — Auth Router | Signup · Login · Welcome"""
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
+from pydantic import BaseModel, EmailStr
+import bcrypt, jwt, os, json, subprocess
+from datetime import datetime, timedelta
+
+try:
+    import nanoid
+    def gen_id(): return nanoid.generate(size=12)
+except:
+    import uuid
+    def gen_id(): return uuid.uuid4().hex[:12]
+
+router = APIRouter()
+JWT_SECRET   = os.getenv("JWT_SECRET", "change-in-production")
+JWT_EXPIRE_H = 24
+RESEND_KEY   = os.getenv("RESEND_API_KEY", "")
+APP_URL      = os.getenv("APP_URL", "https://fadereach.tinlance.com")
+
+class SignupReq(BaseModel):
+    email: EmailStr
+    name: str
+    password: str
+    company: str | None = None
+
+class LoginReq(BaseModel):
+    email: EmailStr
+    password: str
+
+def make_token(tenant_id: str, plan: str) -> str:
+    return jwt.encode(
+        {"sub": tenant_id, "plan": plan,
+         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_H)},
+        JWT_SECRET, algorithm="HS256"
+    )
+
+async def send_welcome_email(email: str, name: str):
+    """Resend — existing Tinlance KalevioAI account"""
+    if not RESEND_KEY:
+        return
+    try:
+        import httpx
+        async with httpx.AsyncClient() as client:
+            await client.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {RESEND_KEY}"},
+                json={
+                    "from": "Lloyd at FadeReach <hello@fadereach.tinlance.com>",
+                    "to": email,
+                    "subject": "Your FadeReach workspace is live",
+                    "html": f"""
+                    <div style="font-family:Inter,sans-serif;max-width:520px;margin:0 auto;color:#1a1a2e">
+                    <h2 style="color:#00E5A0">Welcome, {name} ✦</h2>
+                    <p>Your FadeReach workspace is setting up — takes about 60 seconds.</p>
+                    <p><strong>Your next 3 steps:</strong></p>
+                    <ol>
+                      <li>Add your first sending domain</li>
+                      <li>We check DNS records and guide you through any fixes</li>
+                      <li>Warmup starts automatically — you just watch the graph</li>
+                    </ol>
+                    <p style="margin-top:24px">
+                      <a href="{APP_URL}/dashboard"
+                         style="background:#00E5A0;color:#000;padding:12px 24px;
+                                border-radius:8px;text-decoration:none;font-weight:600">
+                        Open dashboard →
+                      </a>
+                    </p>
+                    <p style="margin-top:32px;font-size:13px;color:#666">
+                      Questions? Reply to this email.<br>
+                      — Lloyd, Tinlance Limited
+                    </p>
+                    </div>
+                    """
+                }
+            )
+    except Exception as e:
+        print(f"Welcome email failed: {e}")
+
+async def provision_listmonk(db, tenant_id: str, plan: str):
+    """Background: spin up Docker Listmonk per tenant"""
+    try:
+        result = subprocess.run(
+            ["bash", "/opt/fadereach/infrastructure/provision_tenant.sh",
+             tenant_id, f"{tenant_id}.fadereach.tinlance.com", plan],
+            capture_output=True, text=True, timeout=120
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            async with db.acquire() as conn:
+                await conn.execute("""
+                    UPDATE tenants
+                    SET listmonk_url=$1, listmonk_port=$2, updated_at=NOW()
+                    WHERE id=$3
+                """, data["listmonk_url"], data["port"], tenant_id)
+    except Exception as e:
+        print(f"Listmonk provision failed [{tenant_id}]: {e}")
+
+@router.post("/signup")
+async def signup(req: SignupReq, background_tasks: BackgroundTasks, request: Request):
+    db = request.app.state.db
+    tenant_id = gen_id()
+    pw_hash   = bcrypt.hashpw(req.password.encode(), bcrypt.gensalt()).decode()
+
+    async with db.acquire() as conn:
+        existing = await conn.fetchrow(
+            "SELECT id FROM tenants WHERE email=$1", req.email
+        )
+        if existing:
+            raise HTTPException(409, "Email already registered")
+
+        await conn.execute("""
+            INSERT INTO tenants (id, email, name, company, password_hash, plan, status)
+            VALUES ($1,$2,$3,$4,$5,'trial','trial')
+        """, tenant_id, req.email, req.name, req.company, pw_hash)
+
+    background_tasks.add_task(send_welcome_email, req.email, req.name)
+    background_tasks.add_task(provision_listmonk, db, tenant_id, "trial")
+
+    return {
+        "token":         make_token(tenant_id, "trial"),
+        "tenant_id":     tenant_id,
+        "plan":          "trial",
+        "trial_ends_at": (datetime.utcnow() + timedelta(days=14)).isoformat(),
+        "message":       "Workspace setting up — ready in ~60 seconds.",
+        "next_step":     f"{APP_URL}/onboarding"
+    }
+
+@router.post("/login")
+async def login(req: LoginReq, request: Request):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, password_hash, plan, status FROM tenants WHERE email=$1",
+            req.email
+        )
+    if not row:
+        raise HTTPException(401, "Invalid email or password")
+    if not bcrypt.checkpw(req.password.encode(), row["password_hash"].encode()):
+        raise HTTPException(401, "Invalid email or password")
+    if row["status"] == "suspended":
+        raise HTTPException(403, "Account suspended — contact support@fadereach.tinlance.com")
+
+    return {
+        "token":     make_token(row["id"], row["plan"]),
+        "tenant_id": row["id"],
+        "plan":      row["plan"],
+        "status":    row["status"]
+    }

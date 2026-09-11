@@ -1,0 +1,144 @@
+version: '3.8'
+
+# FadeReach — Full Stack Docker Compose
+# Tinlance Limited | Lloyd
+
+services:
+
+  # ── FastAPI Orchestration Layer ───────────────────────
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: fadereach-api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://fadereach:${POSTGRES_PASSWORD}@postgres/fadereach_meta
+      - JWT_SECRET=${JWT_SECRET}
+      - HUNTER_API_KEY=${HUNTER_API_KEY}
+      - ZEROBOUNCE_API_KEY=${ZEROBOUNCE_API_KEY}
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - LEMONSQUEEZY_WEBHOOK_SECRET=${LEMONSQUEEZY_WEBHOOK_SECRET}
+      - PAYSTACK_SECRET_KEY=${PAYSTACK_SECRET_KEY}
+      - N8N_WEBHOOK_URL=http://n8n:5678/webhook
+      - FADEREACH_API_URL=http://api:8000
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - /opt/fadereach/tenants:/opt/fadereach/tenants
+      - /etc/nginx:/etc/nginx
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - fadereach-net
+
+  # ── React Frontend ────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: fadereach-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=https://fadereach.app/api
+    depends_on:
+      - api
+    networks:
+      - fadereach-net
+
+  # ── PostgreSQL Metadata DB ────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: fadereach-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=fadereach_meta
+      - POSTGRES_USER=fadereach
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - fadereach-net
+
+  # ── Redis (AI credits, rate limiting, sessions) ───────
+  redis:
+    image: redis:7-alpine
+    container_name: fadereach-redis
+    restart: unless-stopped
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - fadereach-net
+
+  # ── n8n AI Orchestration ──────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: fadereach-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=n8n.fadereach.app
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - WEBHOOK_URL=https://n8n.fadereach.app/
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=postgres
+      - DB_POSTGRESDB_PORT=5432
+      - DB_POSTGRESDB_DATABASE=n8n
+      - DB_POSTGRESDB_USER=fadereach
+      - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+      # AI Keys available to workflows
+      - CLAUDE_API_KEY=${CLAUDE_API_KEY}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - APIFY_TOKEN=${APIFY_TOKEN}
+      - FADEREACH_API_URL=http://api:8000
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n-workflows:/home/node/workflows
+    depends_on:
+      - postgres
+    networks:
+      - fadereach-net
+
+  # ── Internal Listmonk (Lloyd's campaigns) ────────────
+  listmonk-internal:
+    image: listmonk/listmonk:latest
+    container_name: listmonk-internal
+    restart: unless-stopped
+    ports:
+      - "9100:9000"
+    environment:
+      - LISTMONK_db__host=postgres
+      - LISTMONK_db__port=5432
+      - LISTMONK_db__user=fadereach
+      - LISTMONK_db__password=${POSTGRES_PASSWORD}
+      - LISTMONK_db__database=listmonk_internal
+      - LISTMONK_app__admin_username=lloyd
+      - LISTMONK_app__admin_password=${LISTMONK_ADMIN_PASSWORD}
+    depends_on:
+      - postgres
+    volumes:
+      - listmonk_uploads:/listmonk/static/uploads
+    networks:
+      - fadereach-net
+
+volumes:
+  postgres_data:
+  redis_data:
+  n8n_data:
+  listmonk_uploads:
+
+networks:
+  fadereach-net:
+    driver: bridge

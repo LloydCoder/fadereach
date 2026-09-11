@@ -1,0 +1,447 @@
+{
+  "name": "FadeReach — Master Ecosystem Orchestrator",
+  "meta": {
+    "description": "The 17-wire flywheel. Runs automatically. Connects every Tinlance product to FadeReach.",
+    "author": "Lloyd (Tinlance Limited)",
+    "version": "1.0.0",
+    "schedule": "Runs daily at 06:00 WAT + event-triggered webhooks"
+  },
+  "nodes": [
+
+    {
+      "id": "schedule-trigger",
+      "name": "Daily Flywheel Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 300],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 5 * * *" }]
+        }
+      },
+      "notes": "Runs at 05:00 UTC (06:00 WAT) every day"
+    },
+
+    {
+      "id": "webhook-trigger",
+      "name": "Event Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "position": [240, 500],
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ecosystem-event",
+        "responseMode": "onReceived"
+      },
+      "notes": "Receives real-time events from all 17 products"
+    },
+
+    {
+      "id": "route-event",
+      "name": "Route by Event Type",
+      "type": "n8n-nodes-base.switch",
+      "position": [460, 300],
+      "parameters": {
+        "dataPropertyName": "event_type",
+        "rules": {
+          "rules": [
+            { "value": "daily_sync",           "outputIndex": 0 },
+            { "value": "olvrix_new_contact",   "outputIndex": 1 },
+            { "value": "olvrix_widget_event",  "outputIndex": 2 },
+            { "value": "resonaforge_engaged",  "outputIndex": 3 },
+            { "value": "threatfade_gap",       "outputIndex": 4 },
+            { "value": "reconos_signal",       "outputIndex": 5 },
+            { "value": "weekly_report",        "outputIndex": 6 },
+            { "value": "weekly_optimize",      "outputIndex": 7 }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "olvrix-sync",
+      "name": "Wire 17: Olvrix → FadeReach Sync",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 200],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/ecosystem/olvrix/sync",
+        "method": "POST",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.FADEREACH_ADMIN_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "trigger", "value": "n8n_daily_sync" }
+          ]
+        }
+      },
+      "notes": "Largest data generator. Syncs CRM contacts + widget signals daily."
+    },
+
+    {
+      "id": "olvrix-widget-hot",
+      "name": "Wire 17b: Olvrix Widget → Hot Lead Alert",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 340],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/inbox/ingest",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "from_email",  "value": "={{ $json.email }}" },
+            { "name": "body",        "value": "Widget interaction: {{ $json.widget_type }} on {{ $json.page_url }}" },
+            { "name": "tenant_id",   "value": "={{ $json.tenant_id }}" },
+            { "name": "intent",      "value": "interested" }
+          ]
+        }
+      },
+      "notes": "Olvrix widget form fills and exit intent → instant hot lead in FadeReach inbox"
+    },
+
+    {
+      "id": "resonaforge-sync",
+      "name": "Wire 10: ResonaForge Signal Bridge",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 480],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/ecosystem/resonaforge/sync",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.FADEREACH_ADMIN_SECRET }}" }
+          ]
+        }
+      },
+      "notes": "Content engagement → warm leads. People who liked/commented posts are pre-qualified."
+    },
+
+    {
+      "id": "threatfade-signals",
+      "name": "Wire 01: ThreatFade Security Gap → Campaign",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 620],
+      "parameters": {
+        "url": "={{ $env.THREATFADE_URL }}/api/email-security-gaps",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal", "value": "={{ $env.INTERNAL_API_KEY }}" }
+          ]
+        }
+      },
+      "notes": "Pull companies with email security gaps from ThreatFade daily"
+    },
+
+    {
+      "id": "threatfade-to-leads",
+      "name": "ThreatFade Gaps → FadeReach Leads",
+      "type": "n8n-nodes-base.code",
+      "position": [920, 620],
+      "parameters": {
+        "jsCode": "// Transform ThreatFade security gaps into FadeReach leads\nconst gaps = $input.first().json.companies || [];\nconst FADEREACH_URL = $env.FADEREACH_API_URL;\n\nconst leads = gaps\n  .filter(g => g.contact_email)\n  .map(g => ({\n    email:        g.contact_email,\n    first_name:   g.contact_first_name,\n    company:      g.company_name,\n    domain:       g.domain,\n    signal_type:  `threatfade_${g.gap_type}`,\n    signal_data:  JSON.stringify(g),\n    icp_score:    g.severity === 'critical' ? 85 : 72,\n  }));\n\nreturn leads.map(l => ({ json: l }));"
+      }
+    },
+
+    {
+      "id": "import-threatfade-leads",
+      "name": "Import ThreatFade Leads to FadeReach",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1140, 620],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/leads/import",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "leads", "value": "={{ $json }}" }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "reconos-signals",
+      "name": "Wire 03: ReconOS OSINT → Opportunity Feed",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 760],
+      "parameters": {
+        "url": "={{ $env.RECONOS_URL }}/api/fadereach-signals",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal", "value": "={{ $env.INTERNAL_API_KEY }}" }
+          ]
+        }
+      },
+      "notes": "ReconOS OFE: 6,277 lines, 145 jurisdictions, AfricanContextEngine. Pull funding/hiring/expansion signals daily."
+    },
+
+    {
+      "id": "weekly-report-trigger",
+      "name": "Weekly Report Generator (Sunday 8am WAT)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 900],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 7 * * 0" }]
+        }
+      }
+    },
+
+    {
+      "id": "get-managed-clients",
+      "name": "Get All Managed Clients",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 900],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/managed/clients",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.FADEREACH_ADMIN_SECRET }}" }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "generate-reports",
+      "name": "Generate Weekly Report Per Client",
+      "type": "n8n-nodes-base.code",
+      "position": [700, 900],
+      "parameters": {
+        "jsCode": "// Generate weekly report for each managed client\nconst clients = $input.first().json.clients || [];\nconst today = new Date();\nconst weekStart = new Date(today - 7 * 24 * 60 * 60 * 1000);\n\nreturn clients\n  .filter(c => c.status === 'active')\n  .map(c => ({\n    json: {\n      client_tenant_id: c.tenant_id,\n      week_start: weekStart.toISOString().split('T')[0],\n      week_end: today.toISOString().split('T')[0],\n    }\n  }));"
+      }
+    },
+
+    {
+      "id": "send-weekly-reports",
+      "name": "Send Weekly Reports",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [920, 900],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/managed/reports/weekly",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.FADEREACH_ADMIN_SECRET }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "client_tenant_id", "value": "={{ $json.client_tenant_id }}" },
+            { "name": "week_start",       "value": "={{ $json.week_start }}" },
+            { "name": "week_end",         "value": "={{ $json.week_end }}" }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "weekly-optimize-trigger",
+      "name": "Weekly Optimization (Sunday 2am WAT)",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 1100],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 1 * * 0" }]
+        }
+      }
+    },
+
+    {
+      "id": "get-all-tenants",
+      "name": "Get All Active Tenants",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [460, 1100],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/admin/tenants?status=active",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.FADEREACH_ADMIN_SECRET }}" }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "run-optimization",
+      "name": "Run Learning Optimization Per Tenant",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 1100],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/learning/optimize/run",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $json.token }}" }
+          ]
+        }
+      },
+      "notes": "Runs RLHF-lite optimization for every tenant. Updates send time recommendations, retires poor performers."
+    },
+
+    {
+      "id": "warmup-monitor",
+      "name": "Daily Warmup Monitor",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 1240],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/domains?warmup_status=warming",
+        "method": "GET",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "Bearer {{ $env.FADEREACH_ADMIN_SECRET }}" }
+          ]
+        }
+      },
+      "notes": "Check all warming domains daily. Alert if bounce rate > 1.5%"
+    },
+
+    {
+      "id": "check-bounces",
+      "name": "Alert on High Bounce Rate",
+      "type": "n8n-nodes-base.if",
+      "position": [920, 1240],
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.bounce_rate }}",
+              "operation": "larger",
+              "value2": 1.5
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "bounce-alert",
+      "name": "Slack Alert — High Bounce Rate",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1140, 1200],
+      "parameters": {
+        "url": "={{ $env.SLACK_WEBHOOK_URL }}",
+        "method": "POST",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "text",
+              "value": "⚠️ *FadeReach Bounce Alert*\nDomain: `{{ $json.domain }}`\nBounce rate: `{{ $json.bounce_rate }}%`\nTenant: `{{ $json.tenant_id }}`\nAction needed: Review lead list quality"
+            }
+          ]
+        }
+      }
+    },
+
+    {
+      "id": "hezcast-content",
+      "name": "Wire 08: HezCast → FadeReach Campaign Copy",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "position": [240, 1400],
+      "parameters": {
+        "rule": {
+          "interval": [{ "field": "cronExpression", "expression": "0 4 * * 1" }]
+        }
+      },
+      "notes": "Every Monday 4am — pull fresh campaign copy from HezCast for all products"
+    },
+
+    {
+      "id": "pull-hezcast-copy",
+      "name": "Pull Fresh Copy from HezCast",
+      "type": "n8n-nodes-base.code",
+      "position": [460, 1400],
+      "parameters": {
+        "jsCode": "// Products to generate copy for\nconst products = [\n  { product: 'threatfade', segment: 'nigerian_fintech' },\n  { product: 'threatfade', segment: 'eu_security_team' },\n  { product: 'webtemify', segment: 'african_dev_agency' },\n  { product: 'kalevioai', segment: 'eu_compliance_officer' },\n  { product: 'giftmode', segment: 'ecommerce_brand' },\n  { product: 'olvrix', segment: 'small_agency' },\n  { product: 'realtyscreen', segment: 'us_landlord' },\n];\nreturn products.map(p => ({ json: p }));"
+      }
+    },
+
+    {
+      "id": "fetch-hezcast",
+      "name": "Fetch HezCast Copy Per Product",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [700, 1400],
+      "parameters": {
+        "url": "={{ $env.FADEREACH_API_URL }}/api/ecosystem/hezcast/copy",
+        "method": "GET",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            { "name": "product", "value": "={{ $json.product }}" },
+            { "name": "segment", "value": "={{ $json.segment }}" }
+          ]
+        }
+      },
+      "notes": "HezCast 287 tests, ready to deploy. Auto-generates campaign copy for all Tinlance products."
+    },
+
+    {
+      "id": "success-log",
+      "name": "Log Flywheel Run",
+      "type": "n8n-nodes-base.code",
+      "position": [1360, 300],
+      "parameters": {
+        "jsCode": "const timestamp = new Date().toISOString();\nconsole.log(`[${timestamp}] FadeReach flywheel run complete`);\nconsole.log(`Processed: Olvrix sync, ResonaForge signals, ThreatFade gaps, ReconOS OSINT`);\nreturn [{ json: { status: 'complete', timestamp } }];"
+      }
+    }
+  ],
+
+  "connections": {
+    "Daily Flywheel Trigger":              { "main": [[{ "node": "Route by Event Type" }]] },
+    "Event Webhook Trigger":               { "main": [[{ "node": "Route by Event Type" }]] },
+    "Route by Event Type": {
+      "main": [
+        [{ "node": "Wire 17: Olvrix → FadeReach Sync" }],
+        [{ "node": "Wire 17b: Olvrix Widget → Hot Lead Alert" }],
+        [{ "node": "Wire 10: ResonaForge Signal Bridge" }],
+        [{ "node": "Wire 01: ThreatFade Security Gap → Campaign" }],
+        [{ "node": "Wire 03: ReconOS OSINT → Opportunity Feed" }],
+        [{ "node": "Log Flywheel Run" }],
+        [{ "node": "Log Flywheel Run" }],
+        [{ "node": "Log Flywheel Run" }]
+      ]
+    },
+    "Wire 01: ThreatFade Security Gap → Campaign": { "main": [[{ "node": "ThreatFade Gaps → FadeReach Leads" }]] },
+    "ThreatFade Gaps → FadeReach Leads":           { "main": [[{ "node": "Import ThreatFade Leads to FadeReach" }]] },
+    "Weekly Report Generator (Sunday 8am WAT)":    { "main": [[{ "node": "Get All Managed Clients" }]] },
+    "Get All Managed Clients":                     { "main": [[{ "node": "Generate Weekly Report Per Client" }]] },
+    "Generate Weekly Report Per Client":           { "main": [[{ "node": "Send Weekly Reports" }]] },
+    "Weekly Optimization (Sunday 2am WAT)":        { "main": [[{ "node": "Get All Active Tenants" }]] },
+    "Get All Active Tenants":                      { "main": [[{ "node": "Run Learning Optimization Per Tenant" }]] },
+    "Daily Warmup Monitor":                        { "main": [[{ "node": "Alert on High Bounce Rate" }]] },
+    "Alert on High Bounce Rate": {
+      "main": [
+        [{ "node": "Slack Alert — High Bounce Rate" }],
+        [{ "node": "Log Flywheel Run" }]
+      ]
+    },
+    "Every Monday 4am — HezCast":                  { "main": [[{ "node": "Pull Fresh Copy from HezCast" }]] },
+    "Pull Fresh Copy from HezCast":                { "main": [[{ "node": "Fetch HezCast Copy Per Product" }]] }
+  },
+
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "last",
+    "timezone": "Africa/Lagos"
+  }
+}

@@ -1,0 +1,211 @@
+{
+  "name": "FadeReach — AI First-Line Personalization Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-first-lines",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Webhook — Receive Leads",
+      "type": "n8n-nodes-base.webhook",
+      "position": [240, 300],
+      "notes": "Receives leads from FadeReach FastAPI. Payload: {tenant_id, leads[], product, tone}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STAGE 1: Quality Gate — Filter bad leads before spending AI credits\nconst leads = $input.first().json.leads;\nconst product = $input.first().json.product;\nconst tone = $input.first().json.tone;\nconst tenantId = $input.first().json.tenant_id;\n\nconst qualified = leads.filter(lead => {\n  // Must have email\n  if (!lead.email) return false;\n  // Must have company or domain\n  if (!lead.company && !lead.domain) return false;\n  // Filter obvious invalid emails\n  if (lead.email.includes('noreply') || lead.email.includes('info@')) return false;\n  // Must have verification status = valid or accept-all\n  if (lead.verification_status === 'invalid') return false;\n  return true;\n});\n\nconsole.log(`Quality gate: ${leads.length} leads → ${qualified.length} qualified`);\n\nreturn qualified.map(lead => ({\n  json: { ...lead, product, tone, tenantId }\n}));"
+      },
+      "id": "quality-gate",
+      "name": "Stage 1 — Quality Gate",
+      "type": "n8n-nodes-base.code",
+      "position": [460, 300],
+      "notes": "Saves AI cost by filtering bad leads first"
+    },
+    {
+      "parameters": {
+        "url": "https://api.apify.com/v2/acts/apify~website-content-crawler/run-sync-get-dataset-items",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "token", "value": "={{$env.APIFY_TOKEN}}"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "startUrls",
+              "value": "=[{\"url\": \"https://{{$json.domain || $json.company_website}}\"}]"
+            },
+            {"name": "maxCrawlPages", "value": "3"},
+            {"name": "maxCrawlDepth", "value": "1"}
+          ]
+        },
+        "options": {"timeout": 30000}
+      },
+      "id": "website-scraper",
+      "name": "Stage 2 — Website Scraper",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [680, 200],
+      "notes": "Scrape prospect website for context. Skip if no domain."
+    },
+    {
+      "parameters": {
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "x-api-key", "value": "={{$env.CLAUDE_API_KEY}}"},
+            {"name": "anthropic-version", "value": "2023-06-01"},
+            {"name": "content-type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "claude-haiku-4-5-20251001"
+            },
+            {"name": "max_tokens", "value": "300"},
+            {
+              "name": "messages",
+              "value": "=[{\"role\": \"user\", \"content\": \"You are an expert cold email copywriter. Generate ONE personalized first line for a cold email.\\n\\nProspect info:\\n- Name: {{$json.first_name}} {{$json.last_name}}\\n- Title: {{$json.title}}\\n- Company: {{$json.company}}\\n- Recent website content: {{$json.website_content || 'Not available'}}\\n- LinkedIn activity: {{$json.linkedin_activity || 'Not available'}}\\n\\nProduct we're pitching: {{$json.product}}\\nTone: {{$json.tone}}\\n\\nRules:\\n1. Reference something SPECIFIC about their company or role\\n2. Do NOT mention competitor names\\n3. Do NOT start with 'I' or 'We'\\n4. Maximum 25 words\\n5. Sound human, not AI\\n6. No generic phrases like 'I came across your profile'\\n\\nReturn ONLY the first line, no explanation.\"}]"
+            }
+          ]
+        }
+      },
+      "id": "claude-writer",
+      "name": "Stage 3 — Claude Writes First Line",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [900, 200],
+      "notes": "Claude API generates primary first line. Cost: ~$0.001 per lead"
+    },
+    {
+      "parameters": {
+        "url": "https://api.deepseek.com/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "Authorization", "value": "Bearer {{$env.DEEPSEEK_API_KEY}}"},
+            {"name": "Content-Type", "value": "application/json"}
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model", "value": "deepseek-chat"
+            },
+            {"name": "max_tokens", "value": "150"},
+            {
+              "name": "messages",
+              "value": "=[{\"role\": \"system\", \"content\": \"You extract the single most unique operational hook from a company. Return only a JSON object: {\\\"hook\\\": \\\"the hook\\\", \\\"pain_point\\\": \\\"the pain\\\"}\"}, {\"role\": \"user\", \"content\": \"Company: {{$json.company}}\\nWebsite content: {{$json.website_content || 'Not available'}}\\nProduct to sell: {{$json.product}}\\n\\nWhat's the ONE hook?\"}]"
+            }
+          ]
+        }
+      },
+      "id": "deepseek-hook",
+      "name": "Stage 3b — DeepSeek Extracts Hook",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [900, 380],
+      "notes": "DeepSeek identifies unique operational hook per company"
+    },
+    {
+      "parameters": {
+        "jsCode": "// STAGE 4: Assemble final personalized email data\nconst lead = $('quality-gate').item.json;\nconst claudeResponse = $('claude-writer').item.json;\nconst deepseekResponse = $('deepseek-hook').item.json;\n\n// Extract Claude first line\nlet firstLine = '';\ntry {\n  const content = claudeResponse.content;\n  if (Array.isArray(content)) {\n    firstLine = content.find(c => c.type === 'text')?.text || '';\n  } else {\n    firstLine = content || '';\n  }\n} catch(e) {\n  firstLine = `Noticed ${lead.company} is doing interesting work in your space.`;\n}\n\n// Extract DeepSeek hook\nlet hook = {};\ntry {\n  const dsContent = deepseekResponse.choices?.[0]?.message?.content || '{}';\n  hook = JSON.parse(dsContent.replace(/```json|```/g, '').trim());\n} catch(e) {\n  hook = { hook: '', pain_point: '' };\n}\n\n// Score the first line quality\nconst qualityScore = (\n  (firstLine.length > 10 && firstLine.length < 150 ? 30 : 0) +\n  (firstLine.includes(lead.company) ? 25 : 0) +\n  (!firstLine.toLowerCase().startsWith('i ') ? 20 : 0) +\n  (!firstLine.includes('I came across') ? 15 : 0) +\n  (firstLine.split(' ').length <= 25 ? 10 : 0)\n);\n\nreturn [{\n  json: {\n    email: lead.email,\n    first_name: lead.first_name,\n    last_name: lead.last_name,\n    company: lead.company,\n    title: lead.title,\n    ai_first_line: firstLine.trim(),\n    ai_hook: hook.hook || '',\n    ai_pain_point: hook.pain_point || '',\n    quality_score: qualityScore,\n    product: lead.product,\n    tenant_id: lead.tenantId,\n    generated_at: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "assembler",
+      "name": "Stage 4 — Assemble & Score",
+      "type": "n8n-nodes-base.code",
+      "position": [1120, 300],
+      "notes": "Combines Claude + DeepSeek outputs, scores quality 0-100"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{$json.quality_score}}",
+              "operation": "larger",
+              "value2": 50
+            }
+          ]
+        }
+      },
+      "id": "quality-filter",
+      "name": "Quality Filter (>50 score)",
+      "type": "n8n-nodes-base.if",
+      "position": [1340, 300],
+      "notes": "Only pass high-quality first lines. Low quality → fallback template"
+    },
+    {
+      "parameters": {
+        "url": "={{$env.FADEREACH_API_URL}}/api/leads/update-first-line",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {"name": "email", "value": "={{$json.email}}"},
+            {"name": "tenant_id", "value": "={{$json.tenant_id}}"},
+            {"name": "ai_first_line", "value": "={{$json.ai_first_line}}"},
+            {"name": "quality_score", "value": "={{$json.quality_score}}"}
+          ]
+        }
+      },
+      "id": "save-to-db",
+      "name": "Stage 5 — Save to FadeReach DB",
+      "type": "n8n-nodes-base.httpRequest",
+      "position": [1560, 200],
+      "notes": "Saves generated first line back to FadeReach leads table"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\"success\": true, \"processed\": {{$runIndex + 1}}, \"message\": \"First lines generated successfully\"}"
+      },
+      "id": "webhook-response",
+      "name": "Respond to FastAPI",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "position": [1780, 300]
+    }
+  ],
+  "connections": {
+    "Webhook — Receive Leads": {"main": [[{"node": "Stage 1 — Quality Gate", "type": "main", "index": 0}]]},
+    "Stage 1 — Quality Gate": {"main": [[{"node": "Stage 2 — Website Scraper", "type": "main", "index": 0}]]},
+    "Stage 2 — Website Scraper": {
+      "main": [
+        [{"node": "Stage 3 — Claude Writes First Line", "type": "main", "index": 0}],
+        [{"node": "Stage 3b — DeepSeek Extracts Hook", "type": "main", "index": 0}]
+      ]
+    },
+    "Stage 3 — Claude Writes First Line": {"main": [[{"node": "Stage 4 — Assemble & Score", "type": "main", "index": 0}]]},
+    "Stage 3b — DeepSeek Extracts Hook": {"main": [[{"node": "Stage 4 — Assemble & Score", "type": "main", "index": 0}]]},
+    "Stage 4 — Assemble & Score": {"main": [[{"node": "Quality Filter (>50 score)", "type": "main", "index": 0}]]},
+    "Quality Filter (>50 score)": {
+      "main": [
+        [{"node": "Stage 5 — Save to FadeReach DB", "type": "main", "index": 0}],
+        [{"node": "Stage 5 — Save to FadeReach DB", "type": "main", "index": 0}]
+      ]
+    },
+    "Stage 5 — Save to FadeReach DB": {"main": [[{"node": "Respond to FastAPI", "type": "main", "index": 0}]]}
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "meta": {
+    "description": "FadeReach 5-AI Personalization Pipeline. Processes leads through quality gate → website scraping → Claude first-line writing → DeepSeek hook extraction → quality scoring → DB save.",
+    "author": "Lloyd (Tinlance Limited)",
+    "version": "1.0.0"
+  }
+}
