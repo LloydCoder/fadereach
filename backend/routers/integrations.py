@@ -4,7 +4,8 @@ import hmac
 import json
 import os
 from datetime import datetime
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
+from .deps import get_current_tenant
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -101,7 +102,7 @@ async def ingest_signal(
 
 
 @router.get("/demand-hypotheses")
-async def list_demand_hypotheses(request: Request, tenant_id: str):
+async def list_demand_hypotheses(request: Request, auth: dict = Depends(get_current_tenant)):
     # Read-only internal bridge; the signed ingestion path creates records.
     db = request.app.state.db
     async with db.acquire() as conn:
@@ -110,6 +111,6 @@ async def list_demand_hypotheses(request: Request, tenant_id: str):
                       recommended_offer, evidence, confidence, status, created_at
                FROM demand_hypotheses WHERE tenant_id=$1
                ORDER BY created_at DESC LIMIT 200""",
-            tenant_id,
+            auth["sub"],
         )
     return {"hypotheses": [dict(row) for row in rows]}
