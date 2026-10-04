@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from .deps import get_current_tenant
 import httpx, os
 from datetime import datetime
+import socket
 
 router = APIRouter()
 
@@ -27,39 +28,49 @@ WARMUP_SCHEDULE = [
 
 class DomainAddReq(BaseModel):
     domain: str
+    dkim_selector: str = "mail"
+    sending_ip: str | None = None
 
-async def check_dns(domain: str) -> dict:
-    """Check SPF, DKIM, DMARC via DNS lookup"""
-    result = {"spf": False, "dkim": False, "dmarc": False, "mx": False}
+async def check_dns(domain: str, dkim_selector: str = "mail", sending_ip: str | None = None) -> dict:
+    """Check observable sender controls without predicting inbox placement."""
+    result = {"spf": False, "dkim": False, "dmarc": False, "mx": False, "ptr": None, "dmarc_policy": None}
     try:
         import dns.resolver
-        # SPF
         try:
             answers = dns.resolver.resolve(domain, "TXT")
-            for r in answers:
-                if "v=spf1" in str(r):
-                    result["spf"] = True
-        except: pass
-        # DKIM
+            result["spf"] = any("v=spf1" in str(r).lower() for r in answers)
+        except Exception:
+            pass
         try:
-            dns.resolver.resolve(f"mail._domainkey.{domain}", "TXT")
-            result["dkim"] = True
-        except: pass
-        # DMARC
+            answers = dns.resolver.resolve(f"{dkim_selector}._domainkey.{domain}", "TXT")
+            result["dkim"] = any("v=DKIM1" in str(r).upper() or "P=" in str(r).upper() for r in answers)
+        except Exception:
+            pass
         try:
             answers = dns.resolver.resolve(f"_dmarc.{domain}", "TXT")
             for r in answers:
-                if "v=DMARC1" in str(r):
+                value = str(r).replace('"', '')
+                if "v=DMARC1" in value.upper():
                     result["dmarc"] = True
-        except: pass
-        # MX
+                    for part in value.split(";"):
+                        if part.strip().lower().startswith("p="):
+                            result["dmarc_policy"] = part.split("=", 1)[1].strip().lower()
+        except Exception:
+            pass
         try:
             dns.resolver.resolve(domain, "MX")
             result["mx"] = True
-        except: pass
-    except Exception as e:
-        print(f"DNS check error [{domain}]: {e}")
+        except Exception:
+            pass
+        if sending_ip:
+            try:
+                result["ptr"] = bool(socket.gethostbyaddr(sending_ip)[0])
+            except Exception:
+                result["ptr"] = False
+    except Exception as exc:
+        print(f"DNS check error [{domain}]: {exc}")
     return result
+
 
 def calculate_health_score(dns: dict, bounce_rate: float,
                             complaint_rate: float, warmup_day: int) -> tuple[int, int, list]:
@@ -234,7 +245,7 @@ async def add_domain(
             VALUES ($1, $2, 'checking') RETURNING id
         """, tenant_id, req.domain.lower().strip())
 
-    background_tasks.add_task(_verify_and_score_domain, db, domain_id, req.domain.lower().strip())
+    background_tasks.add_task(_verify_and_score_domain, db, domain_id, req.domain.lower().strip(), req.dkim_selector, req.sending_ip)
 
     return {
         "domain_id":  domain_id,
@@ -337,10 +348,10 @@ async def deliverability_copilot(
     }
 
 # ── Internal helpers ────────────────────────────
-async def _verify_and_score_domain(db, domain_id: int, domain: str):
+async def _verify_and_score_domain(db, domain_id: int, domain: str, dkim_selector: str = "mail", sending_ip: str | None = None):
     """Background: check DNS + score + update DB"""
     try:
-        dns = await check_dns(domain)
+        dns = await check_dns(domain, dkim_selector, sending_ip)
         score, readiness, _ = calculate_health_score(dns, 0.0, 0.0, 0)
         async with db.acquire() as conn:
             await conn.execute("""
@@ -362,7 +373,7 @@ def _get_dns_guide(domain: str) -> dict:
         "spf": {
             "type": "TXT", "name": "@",
             "value": "v=spf1 ip4:YOUR_VPS_IP ~all",
-            "note": "Replace YOUR_VPS_IP with your EC2 IP (13.50.16.19)"
+            "note": "Use the public sending IP assigned to your mail infrastructure."
         },
         "dkim": {
             "type": "TXT", "name": "mail._domainkey",
