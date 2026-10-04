@@ -78,7 +78,7 @@ The FadeReach repository can validate the contract and fail-closed behavior in C
 
 ## Final reconciliation evidence
 
-Final main commit: `a64b2770078346ebe0a98d823fd4f7bfa7b41e58`. The required repository workflows completed successfully on that promoted commit. The final forensic audit additionally verified that the documentation index resolves to existing files and that no open PRs or issues remain.
+Final main commit: `3597b31b39b0e1a9026f6eb4aa14661a14e27d70`. The required repository workflows completed successfully on that promoted commit. The final forensic audit additionally verified that the documentation index resolves to existing files and that no open PRs or issues remain.
 
 
 ## Final current-main forensic pass
@@ -103,18 +103,18 @@ This ledger also tracks the post-hardening product-completion program. It supers
 | 9 | Buying committee intelligence | **COMPLETE — CI-green on branch/PR gate** |
 | 10 | Account memory | **COMPLETE — CI-green on branch/PR gate** |
 | 11 | Revenue intelligence | **COMPLETE — CI-green on branch/PR gate** |
-| 12 | Message intelligence | Pending |
-| 13 | Evidence-backed personalization | Pending |
-| 14 | Governed AI layer | Pending |
-| 15 | Dynamic autonomy engine | Pending |
-| 16 | Durable outbound execution | Pending |
-| 17 | Deliverability intelligence/control plane | Pending |
-| 18 | Outbound provider mesh | Pending |
-| 19 | Experimentation & causal learning | Pending |
-| 20 | AI evaluation & red-team gate | Pending |
-| 21 | Enterprise security & supply chain | Pending |
-| 22 | Observability, SRE & DR | Pending |
-| 23 | Enterprise governance & Trust Center | Pending |
-| 24 | Production certification / Enterprise GA | Pending |
+| 12 | Message intelligence | **COMPLETE — merged and CI-green** |
+| 13 | Evidence-backed personalization | **COMPLETE — merged and CI-green** |
+| 14 | Governed AI layer | **COMPLETE — merged and CI-green** |
+| 15 | Dynamic autonomy engine | **COMPLETE — merged and CI-green** |
+| 16 | Durable outbound execution | **COMPLETE — merged and CI-green** |
+| 17 | Deliverability intelligence/control plane | **COMPLETE — merged and CI-green** |
+| 18 | Outbound provider mesh | **COMPLETE — merged and CI-green** |
+| 19 | Experimentation & causal learning | **COMPLETE — merged and CI-green** |
+| 20 | AI evaluation & red-team gate | **COMPLETE — merged and CI-green** |
+| 21 | Enterprise security & supply chain | **COMPLETE — merged and CI-green** |
+| 22 | Observability, SRE & DR | **COMPLETE — merged and CI-green** |
+| 23 | Enterprise governance & Trust Center | **COMPLETE — merged and CI-green** |
+| 24 | Production certification / Enterprise GA | **COMPLETE — merged and CI-green** |
 
 **Promotion rule:** no phase is promoted on feature presence alone. The phase implementation, tests, migration/data contracts, security controls, operational documentation, and actual GitHub workflow run on the promoted commit must all pass. External production evidence remains separate and is required for Enterprise GA.
