@@ -68,11 +68,40 @@ async def require_admin(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
+    """Authenticate administrative access with a dedicated secret and network policy.
+
+    Admin access is deliberately separate from tenant sessions. The shared secret
+    remains a bootstrap control until enterprise identity/SSO is available, but
+    production access is additionally constrained by an explicit CIDR allowlist.
+    """
+    import hmac
+
     admin_secret = os.getenv("ADMIN_SECRET", "")
     if not admin_secret:
         raise HTTPException(503, "Administrative authentication is not configured")
     if os.getenv("ENVIRONMENT") == "production" and len(admin_secret) < 32:
         raise HTTPException(503, "Administrative authentication is misconfigured")
+
+    raw_cidrs = [
+        item.strip()
+        for item in os.getenv("ADMIN_ALLOWED_IP_CIDRS", "").split(",")
+        if item.strip()
+    ]
+    if os.getenv("ENVIRONMENT") == "production" and not raw_cidrs:
+        raise HTTPException(503, "Administrative network allowlist is not configured")
+
+    if raw_cidrs:
+        client_ip = request.client.host if request.client else ""
+        try:
+            address = ipaddress.ip_address(client_ip)
+            permitted = any(
+                address in ipaddress.ip_network(cidr, strict=False)
+                for cidr in raw_cidrs
+            )
+        except ValueError as exc:
+            raise HTTPException(403, "Administrative network is not permitted") from exc
+        if not permitted:
+            raise HTTPException(403, "Administrative network is not permitted")
 
     redis = request.app.state.redis
     client_ip = request.client.host if request.client else "unknown"
@@ -85,10 +114,9 @@ async def require_admin(
             raise HTTPException(429, "Too many administrative authentication attempts")
     except HTTPException:
         raise
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(503, "Administrative rate limiting is temporarily unavailable") from exc
 
-    import hmac
     if not hmac.compare_digest(credentials.credentials, admin_secret):
         raise HTTPException(403, "Admin access required")
     return {"role": "admin"}
