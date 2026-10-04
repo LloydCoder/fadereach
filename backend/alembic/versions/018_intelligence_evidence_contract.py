@@ -6,7 +6,7 @@ Revises: 017_data_governance
 
 from alembic import op
 
-revision = "018_intelligence_evidence_contract"
+revision = "018_intel_evidence_contract"
 down_revision = "017_data_governance"
 branch_labels = None
 depends_on = None
