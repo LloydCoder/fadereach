@@ -59,9 +59,11 @@ jobs:
           MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
           DATABASE_URL: postgresql://fadereach_runtime:runtime-password@localhost:5432/fadereach_test
         run: |
-          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "CREATE ROLE fadereach_runtime LOGIN PASSWORD 'runtime-password';"
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -v ON_ERROR_STOP=1 -c "CREATE ROLE fadereach_runtime LOGIN PASSWORD 'runtime-password'; CREATE ROLE fadereach_worker LOGIN BYPASSRLS PASSWORD 'worker-password';"
           cd .. && alembic upgrade head
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT relrowsecurity FROM pg_class WHERE relname = 'campaigns';" | grep -q t
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT rolbypassrls FROM pg_roles WHERE rolname = 'fadereach_worker';" | grep -q t
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT has_table_privilege('fadereach_worker','execution_jobs','SELECT,UPDATE');" | grep -q t
       - name: Verify tenant RLS isolation
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -v ON_ERROR_STOP=1 -c "INSERT INTO tenants (id,email,name,password_hash) VALUES ('ci-tenant-a','a@example.test','Tenant A','test'), ('ci-tenant-b','b@example.test','Tenant B','test') ON CONFLICT (id) DO NOTHING;"
@@ -103,6 +105,7 @@ jobs:
           JWT_SECRET=ci-jwt-secret-at-least-32-characters
           CREDENTIAL_ENCRYPTION_KEY=ci-credential-key-at-least-32-characters
           POSTGRES_RUNTIME_PASSWORD=ci-runtime-password
+          POSTGRES_WORKER_PASSWORD=ci-worker-password
           N8N_DB_PASSWORD=ci-n8n-db-password
           LISTMONK_DB_PASSWORD=ci-listmonk-db-password
           LISTMONK_ADMIN_PASSWORD=ci-password
