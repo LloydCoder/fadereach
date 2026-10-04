@@ -7,7 +7,7 @@ from psycopg2.errors import InsufficientPrivilege
 
 TENANT_TABLES = {
     "domains", "leads", "campaigns", "replies", "billing_events",
-    "workspace_members", "api_keys", "provisioning_jobs",
+    "workspace_members", "audit_log", "api_keys", "provisioning_jobs",
     "provider_connections", "suppression_entries", "campaign_executions",
     "messages", "message_events", "lead_intelligence",
     "intelligence_signals", "demand_hypotheses", "accounts",
