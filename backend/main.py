@@ -10,15 +10,17 @@ import asyncpg, redis.asyncio as aioredis
 import os
 from datetime import datetime
 from tenant_context import tenant_id_context
+from db import TenantAwarePool
 
-DB_URL      = os.getenv("DATABASE_URL", "postgresql://fadereach:password@localhost/fadereach_meta")
+DB_URL      = os.getenv("DATABASE_URL", "postgresql://fadereach_runtime:password@localhost/fadereach_meta")
 REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 APP_URL     = os.getenv("APP_URL", "https://fadereach.tinlance.com")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.db    = await asyncpg.create_pool(DB_URL, min_size=2, max_size=10, setup=_setup_db_connection)
+    raw_db = await asyncpg.create_pool(DB_URL, min_size=2, max_size=10)
+    app.state.db = TenantAwarePool(raw_db)
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     await _init_db(app.state.db)
     print(f"✓ FadeReach API [{ENVIRONMENT}] → {APP_URL}")
@@ -45,20 +47,20 @@ async def tenant_context_scope(request: Request, call_next):
     finally:
         tenant_id_context.reset(token)
 
-app.add_middleware(CORSMiddleware,
-    allow_origins=["https://fadereach.tinlance.com","https://fadereach.ai","http://localhost:3000","http://localhost:5173"],
-    allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
+CORS_ORIGINS = [origin.strip() for origin in os.getenv(
+    "CORS_ORIGINS",
+    "https://fadereach.tinlance.com,https://fadereach.ai,http://localhost:3000,http://localhost:5173",
+).split(",") if origin.strip()]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=CORS_ORIGINS,
+    allow_credentials=True,
+    allow_methods=["GET","POST","PUT","PATCH","DELETE","OPTIONS"],
+    allow_headers=["Authorization","Content-Type","Accept","X-Requested-With"],
 )
 
 
-
-async def _setup_db_connection(connection):
-    """Bind every checked-out PostgreSQL connection to the request tenant."""
-    tenant_id = tenant_id_context.get()
-    await connection.execute(
-        "SELECT set_config('app.tenant_id', $1, false)",
-        tenant_id or "",
-    )
 
 async def _init_db(pool):
     """Deprecated compatibility hook; schema is managed by Alembic."""
@@ -69,17 +71,17 @@ async def health(request: Request):
     try:
         await request.app.state.db.fetchval("SELECT 1")
         db_ok = True
-    except: db_ok = False
+    except Exception: db_ok = False
     try:
         await request.app.state.redis.ping()
         redis_ok = True
-    except: redis_ok = False
+    except Exception: redis_ok = False
     return {
         "status": "ok" if (db_ok and redis_ok) else "degraded",
         "service": "FadeReach API", "version": "1.0.0",
         "environment": ENVIRONMENT, "database": "ok" if db_ok else "error",
         "redis": "ok" if redis_ok else "error",
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now().astimezone().isoformat(),
     }
 
 # ── Phase 2 routers ─────────────────────────────

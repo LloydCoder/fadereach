@@ -29,3 +29,8 @@ def test_core_router_surface_is_registered():
 def test_app_imports_without_starting_external_services():
     client = TestClient(app)
     assert client is not None
+
+
+def test_expected_core_routes_are_unique():
+    routes = [route.path for route in app.routes]
+    assert len(routes) == len(set(routes))
