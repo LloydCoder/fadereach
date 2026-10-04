@@ -1,0 +1,5 @@
+"""Phase 18 outbound provider mesh."""
+from alembic import op
+revision="044_provider_mesh"; down_revision="043_deliverability_decision"; branch_labels=None; depends_on=None
+def upgrade(): op.execute("""CREATE TABLE IF NOT EXISTS provider_capabilities (id BIGSERIAL PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,provider_connection_id BIGINT NOT NULL REFERENCES provider_connections(id) ON DELETE CASCADE,capabilities JSONB NOT NULL DEFAULT '{}'::jsonb,health_status TEXT NOT NULL DEFAULT 'unknown',limits JSONB NOT NULL DEFAULT '{}'::jsonb,last_checked_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(tenant_id,provider_connection_id)); ALTER TABLE provider_capabilities ENABLE ROW LEVEL SECURITY; ALTER TABLE provider_capabilities FORCE ROW LEVEL SECURITY; CREATE POLICY provider_capabilities_tenant_isolation ON provider_capabilities USING(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));""")
+def downgrade(): op.execute("DROP TABLE IF EXISTS provider_capabilities CASCADE")
