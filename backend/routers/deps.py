@@ -43,7 +43,7 @@ async def get_current_tenant(
 
     # Plan/status are authoritative database state. JWT claims are session
     # identity only and are deliberately not trusted for authorization.
-    return dict(tenant)
+    return {**dict(tenant), "sub": str(tenant["id"])}
 
 async def require_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
