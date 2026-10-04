@@ -298,6 +298,7 @@ Key references:
 - [Phase 8 — Opportunity Hypotheses](docs/PHASE_08_OPPORTUNITY_HYPOTHESES.md)
 - [Phase 9 — Buying Committee](docs/PHASE_09_BUYING_COMMITTEE.md)
 - [Phase 10 — Account Memory](docs/PHASE_10_ACCOUNT_MEMORY.md)
+- [Phase 11 — Revenue Intelligence](docs/PHASE_11_REVENUE_INTELLIGENCE.md)
 - [Supply-Chain Evidence](docs/SUPPLY_CHAIN.md)
 
 Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.
