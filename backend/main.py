@@ -69,10 +69,16 @@ async def tenant_context_scope(request: Request, call_next):
     finally:
         tenant_id_context.reset(token)
 
-CORS_ORIGINS = [origin.strip() for origin in os.getenv(
-    "CORS_ORIGINS",
-    "https://fadereach.tinlance.com,https://fadereach.ai,http://localhost:3000,http://localhost:5173",
-).split(",") if origin.strip()]
+default_cors = (
+    "https://fadereach.app,https://fadereach.tinlance.com"
+    if ENVIRONMENT == "production"
+    else "https://fadereach.app,https://fadereach.tinlance.com,http://localhost:3000,http://localhost:5173"
+)
+CORS_ORIGINS = [
+    origin.strip()
+    for origin in os.getenv("CORS_ORIGINS", default_cors).split(",")
+    if origin.strip()
+]
 
 app.add_middleware(
     CORSMiddleware,
