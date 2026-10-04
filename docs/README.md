@@ -52,6 +52,13 @@ TADS and SDEA provide upstream demand/account intelligence. FadeReach converts v
 34. [CI Verification](ci-verification.md)
 35. [Phase Gates](phase-gates.md)
 36. [Final Forensic Enterprise Audit](FINAL_FORENSIC_AUDIT.md)
+37. [Phase 1 — Canonical Revenue Intelligence Model](PHASE_01_CANONICAL_REVENUE_MODEL.md)
+
+## Advanced enterprise phase sequence
+
+The product-completion sequence is distinct from the historical F0–F17 repository-hardening ledger. The current serial roadmap is 1) canonical revenue intelligence data model, 2) evidence ledger, 3) signal ingestion and normalization, 4) signal convergence, 5) temporal intelligence, 6) account graph, 7) why-now, 8) opportunity hypotheses, 9) buying committee intelligence, 10) account memory, 11) revenue intelligence, 12) message intelligence, 13) evidence-backed personalization, 14) governed AI, 15) dynamic autonomy, 16) durable outbound execution, 17) deliverability control plane, 18) provider mesh, 19) experimentation/causal learning, 20) AI evaluation/red-team, 21) enterprise security/supply chain, 22) observability/SRE/DR, 23) enterprise governance/trust, 24) production certification/Enterprise GA.
+
+Phase 1 is implemented by `027_canonical_revenue_model` and is CI-green on its promoted branch. Later phases must not be treated as complete merely because earlier repository hardening already exists.
 
 ## Integration references
 
