@@ -98,7 +98,7 @@ async def lemonsqueezy_webhook(
     attrs      = data.get("data", {}).get("attributes", {})
     email      = attrs.get("user_email", "")
     variant_id = str(attrs.get("variant_id", ""))
-    plan       = LS_VARIANT_PLANS.get(variant_id, "growth")
+    plan       = _mapped_plan(LS_VARIANT_PLANS, variant_id, "LemonSqueezy")
 
 
     if event_type == "subscription_created":
@@ -107,7 +107,7 @@ async def lemonsqueezy_webhook(
 
     elif event_type == "subscription_updated":
         new_variant = str(attrs.get("variant_id", ""))
-        new_plan    = LS_VARIANT_PLANS.get(new_variant, plan)
+        new_plan    = _mapped_plan(LS_VARIANT_PLANS, new_variant, "LemonSqueezy")
         await _upgrade_plan(db, email, new_plan)
 
     elif event_type == "subscription_cancelled":
@@ -158,7 +158,7 @@ async def paystack_webhook(
 
     if event == "subscription.create":
         plan_code = obj.get("plan", {}).get("plan_code", "")
-        plan      = PAYSTACK_PLAN_CODES.get(plan_code, "growth")
+        plan      = _mapped_plan(PAYSTACK_PLAN_CODES, plan_code, "Paystack")
         amount    = obj.get("amount", 0) / 100  # Paystack sends kobo
         await _activate_plan(db, email, plan, "paystack", amount)
 
@@ -211,7 +211,7 @@ async def paddle_webhook(
     email    = obj.get("customer", {}).get("email", "") or \
                obj.get("custom_data", {}).get("email", "")
     price_id = obj.get("items", [{}])[0].get("price", {}).get("id", "") if obj.get("items") else ""
-    plan     = PADDLE_PRICE_PLANS.get(price_id, "agency")
+    plan     = _mapped_plan(PADDLE_PRICE_PLANS, price_id, "Paddle")
 
     if not await _claim_webhook_event(db, "paddle", event_id, data):
         return {"received": True, "duplicate": True}
@@ -222,7 +222,7 @@ async def paddle_webhook(
 
     elif event_type == "subscription.updated":
         new_price_id = obj.get("items", [{}])[0].get("price", {}).get("id", "")
-        new_plan     = PADDLE_PRICE_PLANS.get(new_price_id, plan)
+        new_plan     = _mapped_plan(PADDLE_PRICE_PLANS, new_price_id, "Paddle")
         await _upgrade_plan(db, email, new_plan)
 
     elif event_type == "subscription.cancelled":
