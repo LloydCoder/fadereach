@@ -158,7 +158,8 @@ async def mark_read(
 async def ingest_reply(
     req: ReplyIngestReq,
     background_tasks: BackgroundTasks,
-    request: Request
+    request: Request,
+    auth: dict = Depends(get_current_tenant),
 ):
     """
     Called by Listmonk webhook or SMTP parser when reply received
@@ -168,10 +169,12 @@ async def ingest_reply(
 
     # Classify intent (fast, rule-based)
     intent, sentiment = classify_intent(req.body)
+
+    # Tenant identity comes from the authenticated session, never from the request body.
+    tenant_id = auth["id"]
     is_hot = intent in ["interested", "more_info", "referral"]
 
     # Find lead
-    tenant_id = req.tenant_id
     lead_id   = None
     if tenant_id:
         async with db.acquire() as conn:
