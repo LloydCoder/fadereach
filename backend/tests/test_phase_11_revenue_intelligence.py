@@ -12,3 +12,6 @@ def test_daily_revenue_metrics_contract():
     assert "revenue_metrics_daily" in SOURCE
     assert "signal_to_opportunity_rate" in SOURCE
     assert "meeting_to_won_rate" in SOURCE
+
+def test_attribution_weights_are_bounded_in_schema():
+    assert "weight >= 0 AND weight <= 1" in SOURCE
