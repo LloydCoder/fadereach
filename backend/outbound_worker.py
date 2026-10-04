@@ -340,6 +340,10 @@ async def _ensure_campaign(
                     "name": name, "subject": subject, "lists": [list_id],
                     "from_email": from_email, "content_type": "html",
                     "messenger": "email", "type": "regular", "body": body,
+                    "headers": [
+                        {"List-Unsubscribe": "<{{ UnsubscribeURL }}>"},
+                        {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
+                    ],
                 },
             )
             if response.status_code >= 300:
