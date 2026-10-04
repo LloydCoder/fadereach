@@ -18,19 +18,24 @@ from outbound_worker import run_outbound_worker
 from retention_worker import run_retention_worker
 
 DB_URL      = os.getenv("DATABASE_URL")
-if not DB_URL:
-    raise RuntimeError("DATABASE_URL must be configured")
 REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+WORKER_DB_URL = os.getenv("WORKER_DATABASE_URL") or DB_URL
+if ENVIRONMENT == "production" and not os.getenv("WORKER_DATABASE_URL"):
+    raise RuntimeError("WORKER_DATABASE_URL must be configured in production")
+if not DB_URL:
+    raise RuntimeError("DATABASE_URL must be configured")
 APP_URL     = os.getenv("APP_URL", "https://fadereach.tinlance.com")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     raw_db = await asyncpg.create_pool(DB_URL, min_size=2, max_size=10)
+    worker_db = await asyncpg.create_pool(WORKER_DB_URL, min_size=1, max_size=3)
     app.state.db = TenantAwarePool(raw_db)
+    app.state.worker_queue_db = worker_db
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     await _init_db(app.state.db)
-    worker_task = asyncio.create_task(run_outbound_worker(app.state.db))
+    worker_task = asyncio.create_task(run_outbound_worker(app.state.db, app.state.worker_queue_db))
     retention_task = asyncio.create_task(run_retention_worker(app.state.db))
     app.state.outbound_worker = worker_task
     app.state.retention_worker = retention_task
@@ -46,6 +51,7 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
         await app.state.db.close()
+        await app.state.worker_queue_db.close()
         await app.state.redis.close()
 
 app = FastAPI(

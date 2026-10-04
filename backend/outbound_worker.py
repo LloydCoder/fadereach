@@ -19,14 +19,23 @@ from tenant_context import tenant_id_context
 
 
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+
+class ExecutionCancelled(RuntimeError):
+    """Terminal worker outcome: the campaign was intentionally stopped."""
 POLL_SECONDS = float(os.getenv("OUTBOUND_WORKER_POLL_SECONDS", "2"))
 LOCK_TIMEOUT_MINUTES = int(os.getenv("OUTBOUND_JOB_LOCK_TIMEOUT_MINUTES", "15"))
 
 
-async def run_outbound_worker(db) -> None:
+async def run_outbound_worker(db, queue_db=None) -> None:
+    """Run durable outbound work with a narrowly privileged queue connection.
+
+    queue_db is allowed to bypass RLS only for claiming execution_jobs. All
+    tenant-owned work continues through the tenant-aware application pool.
+    """
+    queue_db = queue_db or db
     while True:
         try:
-            job = await _claim_job(db)
+            job = await _claim_job(queue_db)
             if job:
                 await _run_job(db, job)
             else:
@@ -58,10 +67,7 @@ async def _claim_job(db):
             )
             UPDATE execution_jobs j
             SET status='running',
-                attempts = CASE
-                    WHEN j.status='running' THEN j.attempts
-                    ELSE j.attempts + 1
-                END,
+                attempts = j.attempts + 1,
                 locked_at=NOW(),
                 locked_by=$2,
                 updated_at=NOW()
@@ -88,6 +94,27 @@ async def _run_job(db, job: dict) -> None:
                 """,
                 job["id"],
             )
+    except ExecutionCancelled as exc:
+        error = str(exc)[:2000]
+        async with db.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE execution_jobs
+                SET status='cancelled', completed_at=NOW(),
+                    locked_at=NULL, locked_by=NULL, last_error=$2, updated_at=NOW()
+                WHERE id=$1
+                """,
+                job["id"], error,
+            )
+            await conn.execute(
+                """
+                UPDATE campaign_executions
+                SET status='cancelled', cancel_requested=TRUE,
+                    error_message=$2, completed_at=NOW(), updated_at=NOW()
+                WHERE id=$1
+                """,
+                job["execution_id"], error,
+            )
     except Exception as exc:
         error = str(exc)[:2000]
         terminal = job["attempts"] >= job["max_attempts"]
@@ -108,7 +135,8 @@ async def _run_job(db, job: dict) -> None:
             await conn.execute(
                 """
                 UPDATE campaign_executions
-                SET status=$2, error_count=recipient_count,
+                SET status=$2,
+                    error_count=CASE WHEN $2='failed' THEN recipient_count ELSE error_count END,
                     error_message=$3,
                     completed_at=CASE WHEN $2='failed' THEN NOW() ELSE completed_at END
                 WHERE id=$1
@@ -123,8 +151,8 @@ async def _execute(db, job: dict) -> None:
     async with db.acquire() as conn:
         execution = await conn.fetchrow(
             """
-            SELECT ce.id, ce.tenant_id, ce.campaign_id,
-                   ce.provider_connection_id, c.name, c.subject,
+            SELECT ce.id, ce.tenant_id, ce.campaign_id, ce.cancel_requested,
+                   ce.provider_connection_id, c.name, c.subject, c.status AS campaign_status,
                    c.body_html, pc.base_url, pc.api_username,
                    pc.api_token_ciphertext, pc.from_email
             FROM campaign_executions ce
@@ -139,6 +167,8 @@ async def _execute(db, job: dict) -> None:
         )
         if not execution:
             raise RuntimeError("Execution or provider no longer exists")
+        if execution["cancel_requested"] or execution["campaign_status"] in {"paused", "cancelled"}:
+            raise ExecutionCancelled("Outbound execution cancelled before provider submission")
 
         leads = await conn.fetch(
             """
