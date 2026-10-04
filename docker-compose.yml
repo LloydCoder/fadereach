@@ -120,7 +120,7 @@ services:
     networks: [fadereach-net]
 
   listmonk-internal:
-    image: listmonk/listmonk:latest
+    image: listmonk/listmonk:v6.2.0
     restart: unless-stopped
     ports:
       - "127.0.0.1:9100:9000"
