@@ -17,6 +17,7 @@ from middleware.security import SecurityHeadersMiddleware, allowed_hosts
 from outbound_worker import run_outbound_worker
 from routers.unsubscribe import router as unsubscribe_router
 from retention_worker import run_retention_worker
+from observability import collect_metrics
 
 DB_URL      = os.getenv("DATABASE_URL")
 REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -100,6 +101,29 @@ app.add_middleware(
 async def _init_db(pool):
     """Deprecated compatibility hook; schema is managed by Alembic."""
     return None
+
+@app.get("/api/ready")
+async def readiness(request: Request):
+    try:
+        await request.app.state.db.fetchval("SELECT 1")
+        await request.app.state.redis.ping()
+        return {"status": "ready"}
+    except Exception:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"status": "not_ready"}, status_code=503)
+
+
+@app.get("/internal/metrics")
+async def metrics(request: Request):
+    token = os.getenv("METRICS_TOKEN", "")
+    if token:
+        supplied = request.headers.get("Authorization", "")
+        if supplied != f"Bearer {token}":
+            from fastapi.responses import PlainTextResponse
+            return PlainTextResponse("unauthorized", status_code=401)
+    from fastapi.responses import PlainTextResponse
+    return PlainTextResponse(await collect_metrics(request.app), media_type="text/plain; version=0.0.4")
+
 
 @app.get("/api/health")
 async def health(request: Request):
