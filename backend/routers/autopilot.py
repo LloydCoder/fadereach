@@ -1,6 +1,7 @@
 """Human-approved Campaign Autopilot planning and launch orchestration."""
 import json
 import hashlib
+import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
@@ -8,6 +9,9 @@ from .deps import get_current_tenant
 from audit import record_audit
 
 router = APIRouter()
+
+AUTONOMY_ENABLED = os.getenv("FADE_REACH_AUTONOMY_ENABLED", "false").lower() == "true"
+AGENT_PLATFORM_BASE_URL = os.getenv("AGENT_PLATFORM_BASE_URL", "").rstrip("/")
 
 
 def _plan_hash(plan: dict) -> str:
@@ -67,6 +71,8 @@ async def create_plan(
 
         plan = {
             "goal": req.goal,
+            "execution_authority": "tinlance-agent-platform" if AUTONOMY_ENABLED else "fade-reach-human-approval",
+
             "offer": req.offer,
             "target_policy": {
                 "min_signal_score": req.min_signal_score,
@@ -155,6 +161,8 @@ async def launch_plan(
         )
         if not run:
             raise HTTPException(404, "Autopilot run not found")
+        if AUTONOMY_ENABLED and not AGENT_PLATFORM_BASE_URL:
+            raise HTTPException(503, "Autonomy is enabled but Agent Platform delegation is not configured")
         if run["status"] != "approved":
             raise HTTPException(409, "Autopilot run requires explicit human approval")
         if run["stop_requested"]:
@@ -188,6 +196,7 @@ async def launch_plan(
         "run_id": run_id,
         "status": "launched",
         "campaign_id": campaign["id"],
+        "execution_authority": "tinlance-agent-platform" if AUTONOMY_ENABLED else "fade-reach-human-approval",
         "next_action": "Review the generated campaign and use the governed send endpoint after deliverability/compliance checks.",
     }
 
