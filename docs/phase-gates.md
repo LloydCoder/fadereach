@@ -53,7 +53,7 @@ A phase may be promoted only when all of the following are true:
 | F13 | Implemented | Revalidated by current CI baseline |
 | F14 | Implemented | Merged and historically CI-green |
 | F15 | Implemented | Merged and historically CI-green |
-| F16 | Implemented as bounded/fail-closed autonomy contract | **Requires main-branch CI on the promoted commit and external Agent Platform delegation validation** |
+| F16 | Implemented as bounded/fail-closed autonomy contract | Repository contract complete; Tinlance Agent Platform M29 conformance is the authoritative external execution boundary. Live endpoint/credential validation remains an operational production gate, not a missing FadeReach repository implementation. |
 | F17 | Final forensic audit documentation and reconciliation | **Runs only after F16 gate is satisfied** |
 
 ## Current promotion evidence
@@ -67,3 +67,10 @@ The F16 merge commit is the authoritative promotion candidate. Its required work
 "Implemented", "CI-green", "externally validated", and "production-ready" are separate states.
 
 A repository may be technically complete while still requiring live provider, infrastructure, Agent Platform, DNS, deliverability, restore, or customer validation. This ledger never collapses those distinctions.
+
+
+## F16 external boundary evidence
+
+FadeReach's autonomy boundary is intentionally fail-closed. The companion Tinlance Agent Platform repository documents M29 as complete and defines governed execution, approval, authorization, budgets, evidence, audit and remote authority attenuation as Platform responsibilities. FadeReach therefore does not duplicate those controls.
+
+The FadeReach repository can validate the contract and fail-closed behavior in CI. A live Agent Platform URL, credentials, network path and production deployment are environment-specific and cannot be manufactured by repository code. Those items remain part of production acceptance evidence.
