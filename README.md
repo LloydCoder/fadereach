@@ -106,6 +106,11 @@ fadereach/
 
 ## Engineering status
 
+### Advanced enterprise product roadmap
+
+The current advanced roadmap is executed separately from the historical F0–F17 hardening ledger. The serial sequence is: **1 Canonical Revenue Intelligence Data Model → 2 Evidence Ledger → 3 Signal Ingestion & Normalization → 4 Signal Convergence → 5 Temporal Intelligence → 6 Account Intelligence Graph → 7 Why-Now → 8 Opportunity Hypothesis → 9 Buying Committee → 10 Account Memory → 11 Revenue Intelligence → 12 Message Intelligence → 13 Evidence-Backed Personalization → 14 Governed AI → 15 Dynamic Autonomy → 16 Durable Outbound → 17 Deliverability Control Plane → 18 Provider Mesh → 19 Experimentation/Causal Learning → 20 AI Evaluation/Red Team → 21 Security/Supply Chain → 22 Observability/SRE/DR → 23 Enterprise Governance/Trust → 24 Production Certification/Enterprise GA. Each phase requires implementation, tests, documentation reconciliation, and green CI on the promoted commit before the next phase starts.
+
+
 The repository is being hardened in serial production phases. Green CI is a hard phase gate, not proof of production readiness. No subsequent phase is accepted until the current phase has a completed CI/workflow run on its actual code.
 
 Current enterprise sequence:
@@ -283,6 +288,7 @@ Key references:
 - [Intelligence Model](docs/INTELLIGENCE_MODEL.md)
 - [Autonomy Governance](docs/AUTONOMY_GOVERNANCE.md)
 - [Production Readiness](docs/PRODUCTION_READINESS.md)
+- [Phase 1 — Canonical Revenue Intelligence Model](docs/PHASE_01_CANONICAL_REVENUE_MODEL.md)
 - [Supply-Chain Evidence](docs/SUPPLY_CHAIN.md)
 
 Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.
