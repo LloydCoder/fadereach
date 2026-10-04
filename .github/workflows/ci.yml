@@ -1,0 +1,96 @@
+name: FadeReach CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fadereach-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend — compile + import
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Install dependencies
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+      - name: Compile
+        run: python -m compileall -q .
+      - name: Import application
+        env:
+          ENVIRONMENT: test
+          JWT_SECRET: ci-test-secret
+          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          REDIS_URL: redis://localhost:6379/0
+        run: python -c "from main import app; assert app.title == 'FadeReach API'; print(f'Routes: {len(app.routes)}')"
+
+  frontend:
+    name: Frontend — build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: frontend/package.json
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Build
+        run: npm run build
+
+  compose:
+    name: Docker Compose — validate
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Create CI environment
+        run: |
+          cat > .env.ci <<'EOF'
+          POSTGRES_PASSWORD=ci-postgres-password
+          JWT_SECRET=ci-jwt-secret
+          LISTMONK_ADMIN_PASSWORD=ci-listmonk-password
+          N8N_ENCRYPTION_KEY=ci-n8n-encryption-key
+          HUNTER_API_KEY=
+          ZEROBOUNCE_API_KEY=
+          CLAUDE_API_KEY=
+          DEEPSEEK_API_KEY=
+          APIFY_TOKEN=
+          EOF
+      - name: Validate compose
+        run: docker compose --env-file .env.ci config --quiet
+      - name: Validate Docker build contexts
+        run: |
+          test -f backend/Dockerfile
+          test -f frontend/Dockerfile
+
+  shell:
+    name: Infrastructure — shell syntax
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check shell scripts
+        run: |
+          bash -n infrastructure/setup.sh
+          bash -n infrastructure/provision_tenant.sh
+          bash -n scripts/ec2_app_setup.sh
