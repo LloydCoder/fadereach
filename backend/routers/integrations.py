@@ -3,9 +3,10 @@ import hashlib
 import hmac
 import json
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from .deps import get_current_tenant
+from tenant_context import tenant_id_context
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -22,10 +23,19 @@ DEMAND_MAP = {
     "regulatory": ("compliance_change", "Regulatory changes can create a concrete implementation deadline."),
 }
 
-def _verify(raw: bytes, signature: str) -> None:
+def _verify(raw: bytes, signature: str, timestamp: str) -> None:
     if not SIGNAL_SECRET:
         raise HTTPException(503, "Signal ingestion is not configured")
-    expected = hmac.new(SIGNAL_SECRET.encode(), raw, hashlib.sha256).hexdigest()
+    try:
+        ts = int(timestamp)
+    except ValueError as exc:
+        raise HTTPException(401, "Invalid signal timestamp") from exc
+    if abs(datetime.now(timezone.utc).timestamp() - ts) > 300:
+        raise HTTPException(401, "Signal timestamp outside tolerance")
+    signing_payload = f"{ts}.".encode() + raw
+    expected = hmac.new(
+        SIGNAL_SECRET.encode(), signing_payload, hashlib.sha256
+    ).hexdigest()
     provided = signature.removeprefix("sha256=")
     if not hmac.compare_digest(expected, provided):
         raise HTTPException(401, "Invalid signal signature")
@@ -34,9 +44,12 @@ def _verify(raw: bytes, signature: str) -> None:
 async def ingest_signal(
     request: Request,
     x_signal_signature: str = Header("", alias="X-Signal-Signature"),
+    x_signal_timestamp: str = Header("", alias="X-Signal-Timestamp"),
 ):
     raw = await request.body()
-    _verify(raw, x_signal_signature)
+    if len(raw) > 1024 * 1024:
+        raise HTTPException(413, "Signal payload too large")
+    _verify(raw, x_signal_signature, x_signal_timestamp)
     try:
         payload = json.loads(raw)
     except json.JSONDecodeError:
@@ -56,12 +69,29 @@ async def ingest_signal(
         raise HTTPException(400, "tenant_id, source, signal_type and external_id are required")
     if not isinstance(evidence, list):
         raise HTTPException(400, "evidence must be an array")
+    if len(evidence) > 50:
+        raise HTTPException(400, "evidence limit exceeded")
+    for item in evidence:
+        if not isinstance(item, dict) or not item.get("source") or not item.get("claim"):
+            raise HTTPException(400, "Each evidence item requires source and claim")
 
     db = request.app.state.db
+    tenant_ctx = tenant_id_context.set(tenant_id)
     async with db.acquire() as conn:
         tenant = await conn.fetchval("SELECT id FROM tenants WHERE id=$1", tenant_id)
         if not tenant:
             raise HTTPException(404, "Tenant not found")
+        claimed = await conn.fetchval(
+            """
+            INSERT INTO webhook_events (provider,event_id,payload)
+            VALUES ('tads_sdea',$1,$2::jsonb)
+            ON CONFLICT (provider,event_id) DO NOTHING
+            RETURNING id
+            """,
+            external_id, json.dumps(payload),
+        )
+        if not claimed:
+            return {"status": "duplicate", "external_id": external_id}
 
         account_id = None
         if domain:
@@ -118,6 +148,7 @@ async def ingest_signal(
         else:
             hypothesis = None
 
+    tenant_id_context.reset(tenant_ctx)
     return {
         "signal_id": row["id"],
         "demand_hypothesis_id": hypothesis["id"] if hypothesis else None,
