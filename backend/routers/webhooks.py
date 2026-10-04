@@ -4,7 +4,7 @@ All three payment systems handled here
 """
 from fastapi import APIRouter, HTTPException, Request, Header
 import hmac, hashlib, json, os, httpx
-from datetime import datetime
+from datetime import datetime, timezone
 
 router = APIRouter()
 
@@ -13,6 +13,22 @@ PAYSTACK_SECRET_KEY   = os.getenv("PAYSTACK_SECRET_KEY", "")
 PADDLE_WEBHOOK_SECRET = os.getenv("PADDLE_WEBHOOK_SECRET", "")
 RESEND_KEY            = os.getenv("RESEND_API_KEY", "")
 APP_URL               = os.getenv("APP_URL", "https://fadereach.tinlance.com")
+
+async def _claim_webhook_event(db, provider: str, event_id: str, payload: dict) -> bool:
+    """Atomically claim an event; duplicate deliveries become no-ops."""
+    if not event_id:
+        raise HTTPException(400, "Webhook event identifier is required")
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            """INSERT INTO webhook_events (provider, event_id, payload)
+               VALUES ($1,$2,$3::jsonb)
+               ON CONFLICT (provider,event_id) DO NOTHING
+               RETURNING id""",
+            provider, event_id, json.dumps(payload),
+        )
+    return row is not None
+
+
 
 # ── Plan mapping per provider ───────────────────
 LS_VARIANT_PLANS = {
@@ -57,12 +73,15 @@ async def lemonsqueezy_webhook(
 
     data       = json.loads(body)
     event_type = data.get("meta", {}).get("event_name", "")
+    event_id   = f"{event_type}:{data.get('data', {}).get('id', '')}"
+    db         = request.app.state.db
+    if not await _claim_webhook_event(db, "lemonsqueezy", event_id, data):
+        return {"received": True, "duplicate": True}
     attrs      = data.get("data", {}).get("attributes", {})
     email      = attrs.get("user_email", "")
     variant_id = str(attrs.get("variant_id", ""))
     plan       = LS_VARIANT_PLANS.get(variant_id, "growth")
 
-    db = request.app.state.db
 
     if event_type == "subscription_created":
         await _activate_plan(db, email, plan, "lemonsqueezy",
@@ -111,10 +130,13 @@ async def paystack_webhook(
 
     data  = json.loads(body)
     event = data.get("event", "")
+    event_id = f"{event}:{data.get('data', {}).get('id', '')}"
+    db = request.app.state.db
+    if not await _claim_webhook_event(db, "paystack", event_id, data):
+        return {"received": True, "duplicate": True}
     obj   = data.get("data", {})
     email = obj.get("customer", {}).get("email", "")
 
-    db = request.app.state.db
 
     if event == "subscription.create":
         plan_code = obj.get("plan", {}).get("plan_code", "")
@@ -157,7 +179,15 @@ async def paddle_webhook(
 
     data       = json.loads(body)
     event_type = data.get("event_type", "")
+    event_id   = str(data.get("event_id", ""))
+    try:
+        ts = int(dict(p.split("=", 1) for p in (paddle_signature or "").split(";") if "=" in p).get("ts", "0"))
+        if abs(datetime.now(timezone.utc).timestamp() - ts) > 300:
+            raise HTTPException(401, "Paddle webhook timestamp outside tolerance")
+    except ValueError:
+        raise HTTPException(401, "Invalid Paddle webhook timestamp")
     obj        = data.get("data", {})
+    db         = request.app.state.db
 
     # Extract email from customer object
     email    = obj.get("customer", {}).get("email", "") or \
@@ -165,7 +195,8 @@ async def paddle_webhook(
     price_id = obj.get("items", [{}])[0].get("price", {}).get("id", "") if obj.get("items") else ""
     plan     = PADDLE_PRICE_PLANS.get(price_id, "agency")
 
-    db = request.app.state.db
+    if not await _claim_webhook_event(db, "paddle", event_id, data):
+        return {"received": True, "duplicate": True}
 
     if event_type == "subscription.created":
         amount = obj.get("items", [{}])[0].get("price", {}).get("unit_price", {}).get("amount", 0)
@@ -253,14 +284,20 @@ async def _handle_one_time_purchase(db, email: str, product_id: str, provider: s
     pass
 
 async def _log_billing(db, email: str, event: str, provider: str, amount: float, raw: dict):
+    from tenant_context import tenant_id_context
     async with db.acquire() as conn:
         tenant = await conn.fetchrow("SELECT id FROM tenants WHERE email=$1", email)
-        if tenant:
+        if not tenant:
+            return
+        token = tenant_id_context.set(str(tenant["id"]))
+        try:
             await conn.execute("""
                 INSERT INTO billing_events
                 (tenant_id, event_type, provider, amount, currency, metadata)
                 VALUES ($1,$2,$3,$4,'USD',$5)
             """, tenant["id"], event, provider, amount, json.dumps(raw))
+        finally:
+            tenant_id_context.reset(token)
 
 # ── Email notifications via Resend ──────────────
 async def _send_plan_email(email: str, name: str, plan: str,

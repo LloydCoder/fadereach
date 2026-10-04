@@ -12,6 +12,7 @@ from .deps import get_current_tenant
 from middleware.plan_enforcement import enforce_feature_flag
 import secrets, hashlib, json
 from datetime import datetime
+from tenant_context import tenant_id_context
 from typing import Optional
 
 router = APIRouter()
@@ -79,6 +80,8 @@ async def get_api_tenant(
     if key_record["status"] == "suspended":
         raise HTTPException(403, "Account suspended")
 
+    tenant_id_context.set(str(key_record["tenant_id"]))
+
     key_data = {
         "tenant_id": key_record["tenant_id"],
         "scopes":    json.loads(key_record["scopes"]),
@@ -121,21 +124,6 @@ async def create_api_key(
     key_hash = hashlib.sha256(raw_key.encode()).hexdigest()
 
     async with db.acquire() as conn:
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS api_keys (
-                id         SERIAL PRIMARY KEY,
-                tenant_id  TEXT REFERENCES tenants(id) ON DELETE CASCADE,
-                name       TEXT NOT NULL,
-                description TEXT,
-                key_hash   TEXT UNIQUE NOT NULL,
-                key_prefix TEXT NOT NULL,
-                scopes     JSONB NOT NULL,
-                active     BOOLEAN DEFAULT TRUE,
-                created_at TIMESTAMPTZ DEFAULT NOW(),
-                last_used  TIMESTAMPTZ
-            );
-        """)
-
         # Limit to 5 API keys per tenant
         count = await conn.fetchval(
             "SELECT COUNT(*) FROM api_keys WHERE tenant_id=$1 AND active=TRUE",

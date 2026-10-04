@@ -7,7 +7,9 @@ from fastapi import Request, HTTPException
 from datetime import datetime
 import jwt, os
 
-JWT_SECRET = os.getenv("JWT_SECRET", "change-in-production")
+JWT_SECRET = os.getenv("JWT_SECRET", "")
+if os.getenv("ENVIRONMENT") == "production" and len(JWT_SECRET) < 32:
+    raise RuntimeError("JWT_SECRET must be configured with sufficient entropy")
 
 # Plan limits — single source of truth
 PLAN_LIMITS = {
@@ -148,14 +150,14 @@ class TrialGuard:
             try:
                 payload = jwt.decode(token, JWT_SECRET, algorithms=["HS256"])
                 tenant_id = payload.get("sub")
-                plan      = payload.get("plan", "trial")
+                plan      = "trial"
 
                 # Check trial expiry
                 if plan == "trial":
                     db = request.app.state.db
                     async with db.acquire() as conn:
                         row = await conn.fetchrow(
-                            "SELECT trial_ends_at, status FROM tenants WHERE id=$1",
+                            "SELECT trial_ends_at, status, plan FROM tenants WHERE id=$1",
                             tenant_id
                         )
                         if row and row["trial_ends_at"]:
@@ -168,11 +170,11 @@ class TrialGuard:
                                 )
                                 # Still allow read-only routes
                                 request.state.trial_expired = True
-                                request.state.plan = "trial"
+                                request.state.plan = row["plan"]
                                 response = await call_next(request)
                                 return response
 
-                request.state.plan = plan
+                request.state.plan = row["plan"] if row else "trial"
                 request.state.tenant_id = tenant_id
                 request.state.trial_expired = False
             except:
