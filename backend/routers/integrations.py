@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from .deps import get_current_tenant
 from tenant_context import tenant_id_context
+from signal_convergence import persist_signal_and_convergence
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -175,6 +176,20 @@ async def ingest_signal(
                 json.dumps({"company_name": company_name, "domain": domain}),
             )
 
+        organization_id = None
+        if domain:
+            organization_id = await conn.fetchval(
+                """INSERT INTO organizations
+                   (tenant_id, name, website, domain, status)
+                   VALUES ($1,$2,$3,$4,'prospect')
+                   ON CONFLICT (tenant_id, domain)
+                   DO UPDATE SET name=COALESCE(EXCLUDED.name, organizations.name),
+                                 website=COALESCE(EXCLUDED.website, organizations.website),
+                                 updated_at=NOW()
+                   RETURNING id""",
+                tenant_id, company_name, source_url, domain.lower(),
+            )
+
         row = await conn.fetchrow(
             """INSERT INTO intelligence_signals
                (tenant_id, source, signal_type, company_name, domain, observed_at, score, evidence, external_id, source_url, confidence,
@@ -196,6 +211,25 @@ async def ingest_signal(
             source_url,
             min(0.95, 0.50 + score / 200),
             normalized_type, signal_category, freshness_days, raw_payload_hash,
+        )
+
+        await persist_signal_and_convergence(
+            conn,
+            tenant_id,
+            organization_id,
+            {
+                "id": row["id"],
+                "external_id": external_id,
+                "source": source,
+                "signal_type": signal_type,
+                "normalized_type": normalized_type,
+                "signal_category": signal_category,
+                "score": score,
+                "confidence": min(0.95, 0.50 + score / 200),
+                "observed_at": observed_at,
+                "source_url": source_url,
+            },
+            _source_trust_tier(source),
         )
 
         if account_id:
