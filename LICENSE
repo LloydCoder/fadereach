@@ -1,0 +1,58 @@
+TINLANCE LIMITED — FADEREACH PROPRIETARY SOFTWARE LICENSE
+
+Copyright © 2026 Tinlance Limited. All rights reserved.
+
+1. Grant of License
+
+Subject to the terms of this License, Tinlance Limited ("Tinlance") grants you a limited, non-exclusive, non-transferable, revocable license to access, view, and use the FadeReach source code ("Software") solely for internal evaluation, development, testing, security review, or other purposes expressly authorized in writing by Tinlance.
+
+2. Restrictions
+
+Except as expressly permitted in a separate written agreement with Tinlance, you may not:
+
+- sell, sublicense, rent, lease, publish, distribute, or otherwise make the Software available to third parties;
+- reproduce or redistribute the Software or substantial portions of it;
+- create or distribute a commercial product or service derived from the Software;
+- remove copyright, trademark, attribution, or proprietary notices;
+- use the Software to provide a hosted, managed, or competing service;
+- represent that you have rights in the Software that are not granted by this License.
+
+3. Ownership
+
+The Software, including its source code, documentation, architecture, product concepts expressed in the repository, and associated proprietary materials, remains the property of Tinlance Limited. No ownership rights are transferred by this License.
+
+4. Contributions
+
+Unless a separate written contribution agreement states otherwise, contributions submitted to this repository are provided to Tinlance under terms that permit Tinlance to use, modify, reproduce, distribute, sublicense, and otherwise exploit the contribution as part of the Software and related products.
+
+5. Third-Party Components
+
+The Software may include or depend upon third-party software distributed under separate licenses. Those licenses govern the applicable third-party components and are not replaced by this License. See docs/THIRD_PARTY_NOTICES.md and the applicable dependency manifests.
+
+6. Trademarks
+
+This License does not grant rights to use Tinlance, FadeReach, or other Tinlance trademarks, service marks, logos, or branding except as necessary to accurately identify an authorized copy of the Software.
+
+7. No Warranty
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE SOFTWARE IS PROVIDED "AS IS" AND "AS AVAILABLE", WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, TITLE, OR NON-INFRINGEMENT.
+
+8. Limitation of Liability
+
+TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, TINLANCE LIMITED AND ITS CONTRIBUTORS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, EXEMPLARY, OR PUNITIVE DAMAGES, OR FOR ANY LOSS OF PROFITS, REVENUE, DATA, GOODWILL, OR BUSINESS INTERRUPTION, ARISING FROM OR RELATING TO THE SOFTWARE OR ITS USE.
+
+9. Termination
+
+This License terminates automatically if you materially breach its terms. Upon termination, you must stop using the Software and, where legally and technically practicable, delete copies in your possession or control.
+
+10. Reservation of Rights
+
+All rights not expressly granted by this License are reserved by Tinlance Limited.
+
+11. Written Exceptions
+
+Tinlance Limited may grant additional rights by a separate written agreement. Such an agreement controls to the extent of any conflict with this License.
+
+This License is intended as a proprietary software license and is not an OSI-approved open-source license.
+
+For licensing questions or commercial licensing, contact Tinlance Limited through its official channels.
