@@ -233,7 +233,8 @@ async def ingest_signal(
             _source_trust_tier(source),
         )
 
-        await persist_trajectory(conn, tenant_id, organization_id, normalized_type)
+        if organization_id:
+            await persist_trajectory(conn, tenant_id, organization_id, normalized_type)
 
         if account_id:
             await conn.execute(
