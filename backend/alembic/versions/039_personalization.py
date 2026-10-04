@@ -1,0 +1,5 @@
+"""Phase 13 evidence-backed personalization."""
+from alembic import op
+revision="039_personalization"; down_revision="038_message_intelligence"; branch_labels=None; depends_on=None
+def upgrade(): op.execute("""CREATE TABLE IF NOT EXISTS personalization_claims (id BIGSERIAL PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,account_id BIGINT,person_id BIGINT,claim TEXT NOT NULL,evidence_refs JSONB NOT NULL DEFAULT '[]'::jsonb,confidence NUMERIC(5,4) NOT NULL DEFAULT 0 CHECK(confidence BETWEEN 0 AND 1),status TEXT NOT NULL DEFAULT 'validated',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); ALTER TABLE personalization_claims ENABLE ROW LEVEL SECURITY; ALTER TABLE personalization_claims FORCE ROW LEVEL SECURITY; CREATE POLICY personalization_claims_tenant_isolation ON personalization_claims USING(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));""")
+def downgrade(): op.execute("DROP TABLE IF EXISTS personalization_claims CASCADE")
