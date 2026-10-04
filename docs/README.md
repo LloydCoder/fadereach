@@ -66,3 +66,4 @@ Security design references OWASP Top 10:2025, NIST CSF 2.0 and NIST AI RMF. Emai
 ## Change control
 
 Every material behavior change MUST update the affected documentation in the same change set. Phase completion requires implementation, tests, workflow evidence and documentation reconciliation.
+- [Software Supply-Chain Evidence](SUPPLY_CHAIN.md)
