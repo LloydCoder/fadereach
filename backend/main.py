@@ -15,6 +15,7 @@ from tenant_context import tenant_id_context
 from db import TenantAwarePool
 from middleware.security import SecurityHeadersMiddleware, allowed_hosts
 from outbound_worker import run_outbound_worker
+from routers.unsubscribe import router as unsubscribe_router
 from retention_worker import run_retention_worker
 
 DB_URL      = os.getenv("DATABASE_URL")
@@ -169,3 +170,4 @@ app.include_router(integrations.router, prefix="/api/integrations", tags=["Integ
 app.include_router(graph.router, prefix="/api/graph", tags=["Graph"])
 app.include_router(autopilot.router, prefix="/api/autopilot", tags=["Autopilot"])
 app.include_router(enterprise.router, prefix="/api/enterprise", tags=["Enterprise"])
+app.include_router(unsubscribe_router, prefix="/unsubscribe")

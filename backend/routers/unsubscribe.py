@@ -18,7 +18,7 @@ TOKEN_TTL_SECONDS = int(os.getenv("UNSUBSCRIBE_TOKEN_TTL_SECONDS", str(90 * 8640
 
 
 def _secret() -> bytes:
-    value = os.getenv("UNSUBSCRIBE_SECRET") or os.getenv("JWT_SECRET", "")
+    value = os.getenv("UNSUBSCRIBE_SECRET", "")
     if len(value) < 32:
         raise RuntimeError("UNSUBSCRIBE_SECRET/JWT_SECRET must be at least 32 characters")
     return value.encode()
@@ -61,14 +61,21 @@ async def _suppress(request: Request, token: str):
     try:
         async with db.acquire() as conn:
             await conn.execute(
-            """
-            INSERT INTO suppression_entries (tenant_id,email,reason,source)
+                """
+                INSERT INTO suppression_entries (tenant_id,email,reason,source)
             VALUES ($1,$2,'one_click_unsubscribe','list-unsubscribe')
             ON CONFLICT (tenant_id,email) DO UPDATE
             SET reason=EXCLUDED.reason, source=EXCLUDED.source
-            """,
-            payload["tenant_id"], payload["email"],
-        )
+                """,
+                payload["tenant_id"], payload["email"],
+            )
+            await conn.execute(
+                """
+                UPDATE leads SET status='unsubscribed'
+                WHERE tenant_id=$1 AND lower(email)=lower($2)
+                """,
+                payload["tenant_id"], payload["email"],
+            )
     finally:
         tenant_id_context.reset(token_ctx)
     return {"unsubscribed": True}
@@ -85,7 +92,9 @@ async def one_click_unsubscribe(
 
 @router.get("/one-click")
 async def one_click_unsubscribe_get(
-    request: Request,
     token: str = Query(..., min_length=40, max_length=512),
 ):
-    return await _suppress(request, token)
+    # GET is deliberately non-mutating because mail clients and security
+    # scanners may prefetch unsubscribe URLs.
+    _decode_token(token)
+    return {"message": "Unsubscribe endpoint ready. Use POST for one-click removal."}

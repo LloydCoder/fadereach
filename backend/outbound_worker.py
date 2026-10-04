@@ -16,6 +16,7 @@ import httpx
 from cryptography.fernet import Fernet
 
 from tenant_context import tenant_id_context
+from routers.unsubscribe import create_unsubscribe_token
 
 
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
@@ -232,11 +233,11 @@ async def _execute(db, job: dict) -> None:
         list_id = await _ensure_list(client, base, auth, list_name)
         for lead in leads:
             await _ensure_subscriber(
-                client, base, auth, list_id, dict(lead)
+                client, base, auth, list_id, dict(lead), job["tenant_id"]
             )
 
         body = _to_listmonk_template(execution["body_html"])
-        body += '\n\n<p><a href="{{ UnsubscribeURL }}">Unsubscribe</a></p>'
+        body += '\n\n<p><a href="https://fadereach.app/unsubscribe/one-click?token={{ .Subscriber.Attribs.unsubscribe_token }}">Unsubscribe</a></p>'
         external_id = await _ensure_campaign(
             client,
             base,
@@ -316,7 +317,7 @@ async def _ensure_list(client, base, auth, name: str) -> int:
     return int(response.json()["data"]["id"])
 
 
-async def _ensure_subscriber(client, base, auth, list_id: int, lead: dict) -> None:
+async def _ensure_subscriber(client, base, auth, list_id: int, lead: dict, tenant_id: str) -> None:
     email = lead["email"].strip().lower()
     query = urllib.parse.quote(f"subscribers.email = '{email.replace(chr(39), chr(39)*2)}'")
     response = await client.get(
@@ -340,6 +341,7 @@ async def _ensure_subscriber(client, base, auth, list_id: int, lead: dict) -> No
             "company": lead.get("company") or "",
             "ai_first_line": lead.get("ai_first_line") or "",
             "fade_reach_lead_id": lead["id"],
+            "unsubscribe_token": create_unsubscribe_token(tenant_id, email),
         },
     }
 
@@ -391,7 +393,7 @@ async def _ensure_campaign(
                     "from_email": from_email, "content_type": "html",
                     "messenger": "email", "type": "regular", "body": body,
                     "headers": [
-                        {"List-Unsubscribe": "<{{ UnsubscribeURL }}>"},
+                        {"List-Unsubscribe": "<https://fadereach.app/unsubscribe/one-click?token={{ .Subscriber.Attribs.unsubscribe_token }}>"},
                         {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
                     ],
                 },

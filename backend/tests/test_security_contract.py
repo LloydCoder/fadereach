@@ -70,3 +70,21 @@ def test_billing_plan_mapping_fails_closed():
         _mapped_plan({"variant-1": "growth"}, "unknown", "test")
     with pytest.raises(Exception):
         _mapped_plan({"": "growth"}, "", "test")
+
+
+def test_unsubscribe_token_is_signed_and_round_trips(monkeypatch):
+    monkeypatch.setenv("UNSUBSCRIBE_SECRET", "x" * 64)
+    from routers.unsubscribe import create_unsubscribe_token, _decode_token
+    token = create_unsubscribe_token("tenant-a", "User@Example.com")
+    payload = _decode_token(token)
+    assert payload["tenant_id"] == "tenant-a"
+    assert payload["email"] == "user@example.com"
+
+
+def test_unsubscribe_secret_is_not_allowed_to_fall_back_to_jwt(monkeypatch):
+    monkeypatch.delenv("UNSUBSCRIBE_SECRET", raising=False)
+    monkeypatch.setenv("JWT_SECRET", "x" * 64)
+    from routers.unsubscribe import _secret
+    import pytest
+    with pytest.raises(RuntimeError):
+        _secret()
