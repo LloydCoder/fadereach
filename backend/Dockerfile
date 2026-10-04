@@ -19,4 +19,4 @@ COPY alembic.ini /app/alembic.ini
 WORKDIR /app
 EXPOSE 8000
 
-CMD ["sh", "-c", "alembic upgrade head && cd backend && exec uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2"]
+CMD ["sh", "-c", "cd backend && exec uvicorn main:app --host 0.0.0.0 --port 8000 --workers 2"]
