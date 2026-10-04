@@ -295,23 +295,15 @@ def upgrade() -> None:
             updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         );
 
-        CREATE TABLE IF NOT EXISTS messages (
-            id BIGSERIAL PRIMARY KEY,
-            tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
-            sequence_id BIGINT REFERENCES sequences(id) ON DELETE SET NULL,
-            person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
-            opportunity_id BIGINT REFERENCES opportunities(id) ON DELETE SET NULL,
-            channel TEXT NOT NULL DEFAULT 'email'
-                CHECK (channel IN ('email','linkedin','phone','other')),
-            subject TEXT,
-            body TEXT NOT NULL,
-            version INTEGER NOT NULL DEFAULT 1 CHECK (version > 0),
-            personalization_evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
-            status TEXT NOT NULL DEFAULT 'draft'
-                CHECK (status IN ('draft','approved','queued','sent','cancelled','failed')),
-            created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-        );
+        -- messages already exists in migration 005_outbound_execution.
+        -- Extend it instead of introducing a second canonical table.
+        ALTER TABLE messages
+            ADD COLUMN IF NOT EXISTS sequence_id BIGINT,
+            ADD COLUMN IF NOT EXISTS person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
+            ADD COLUMN IF NOT EXISTS opportunity_id BIGINT REFERENCES opportunities(id) ON DELETE SET NULL,
+            ADD COLUMN IF NOT EXISTS body TEXT NOT NULL DEFAULT '',
+            ADD COLUMN IF NOT EXISTS version INTEGER NOT NULL DEFAULT 1,
+            ADD COLUMN IF NOT EXISTS personalization_evidence JSONB NOT NULL DEFAULT '[]'::jsonb;
 
         CREATE TABLE IF NOT EXISTS executions (
             id BIGSERIAL PRIMARY KEY,
@@ -396,6 +388,8 @@ def upgrade() -> None:
         ALTER TABLE replies
             ADD COLUMN IF NOT EXISTS person_id BIGINT REFERENCES people(id) ON DELETE SET NULL,
             ADD COLUMN IF NOT EXISTS opportunity_id BIGINT REFERENCES opportunities(id) ON DELETE SET NULL;
+        CREATE INDEX IF NOT EXISTS idx_messages_tenant_status
+            ON messages(tenant_id, status, created_at DESC);
 
         CREATE INDEX IF NOT EXISTS idx_organizations_tenant_domain ON organizations(tenant_id, domain);
         CREATE INDEX IF NOT EXISTS idx_people_tenant_org ON people(tenant_id, organization_id);
@@ -436,7 +430,6 @@ def upgrade() -> None:
         ALTER TABLE buying_committees ENABLE ROW LEVEL SECURITY;
         ALTER TABLE buying_committee_members ENABLE ROW LEVEL SECURITY;
         ALTER TABLE sequences ENABLE ROW LEVEL SECURITY;
-        ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
         ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
         ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
         ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
@@ -451,7 +444,7 @@ def upgrade() -> None:
                 'organizations','people','products','technologies','initiatives',
                 'commercial_events','observations','evidence','signals','signal_clusters',
                 'opportunities','opportunity_hypotheses','buying_committees',
-                'buying_committee_members','sequences','messages','executions',
+                'buying_committee_members','sequences','executions',
                 'meetings','deals','revenue','outcomes'
             ]
             LOOP
@@ -481,7 +474,6 @@ def downgrade() -> None:
         DROP TABLE IF EXISTS deals CASCADE;
         DROP TABLE IF EXISTS meetings CASCADE;
         DROP TABLE IF EXISTS executions CASCADE;
-        DROP TABLE IF EXISTS messages CASCADE;
         DROP TABLE IF EXISTS sequences CASCADE;
         DROP TABLE IF EXISTS buying_committee_members CASCADE;
         DROP TABLE IF EXISTS buying_committees CASCADE;
