@@ -98,7 +98,7 @@ This ledger also tracks the post-hardening product-completion program. It supers
 | 4 | Signal convergence engine | **COMPLETE — CI-green on branch/PR gate** |
 | 5 | Temporal intelligence | **COMPLETE — CI-green on branch/PR gate** |
 | 6 | Account intelligence graph | **COMPLETE — CI-green on branch/PR gate** |
-| 7 | Why-Now engine | Pending |
+| 7 | Why-Now engine | **COMPLETE — CI-green on branch/PR gate** |
 | 8 | Opportunity hypothesis engine | Pending |
 | 9 | Buying committee intelligence | Pending |
 | 10 | Account memory | Pending |
