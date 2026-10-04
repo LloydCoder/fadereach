@@ -60,7 +60,7 @@ A phase may be promoted only when all of the following are true:
 
 F16 PR #45 was merged into `main` on 2026-10-04. The PR head commit passed the FadeReach CI workflow before merge.
 
-The merge commit itself is the authoritative promotion candidate. Its required workflow run must be verified before F16 is marked green.
+The F16 merge commit is the authoritative promotion candidate. Its required workflow run must be verified before F16 is marked green. The F17 documentation reconciliation is now merged; repository-level F17 acceptance remains conditional on this promoted-commit workflow and the explicit external Agent Platform delegation validation.
 
 ## Important distinction
 
