@@ -65,7 +65,7 @@ The documentation index is the canonical inventory. It includes architecture, da
 
 ## Current forensic findings
 
-The final repository pass verified the tracked-file inventory, documentation links, phase ledger, workflow set, migration/RLS tests, tenant isolation checks, frontend build, Compose validation, security/dependency checks, and supply-chain SBOM generation. No open GitHub issues or pull requests remain after the final reconciliation.
+The final repository pass verified the tracked-file inventory, documentation links, phase ledger, workflow set, migration/RLS tests, tenant isolation checks, frontend build, Compose validation, security/dependency checks, and supply-chain SBOM generation. No open GitHub pull requests remain; the open-issues API contains no standalone issue after excluding merged pull requests.
 
 The final dependency pass also reconciled FastAPI/Vite compatibility, updated validated backend dependencies, and kept the production Python base on the supported 3.12 line. The audit also corrected a production topology defect: durable outbound and retention workers are now isolated in a dedicated worker service, while the API no longer starts background workers or mutates schema at startup. Production migration execution is explicit and occurs before service startup.
 
@@ -92,6 +92,11 @@ No statement in this document overrides actual runtime, CI, provider, infrastruc
 
 ## Promoted evidence
 
-Final reconciled main commit: `a64b2770078346ebe0a98d823fd4f7bfa7b41e58`.
+Final reconciled main commit before this documentation reconciliation: `3597b31b39b0e1a9026f6eb4aa14661a14e27d70`.
 
 Required FadeReach workflows on that commit completed successfully: backend compile/migration/RLS/tests, frontend build, Compose validation, shell syntax, security static/dependency audit, and supply-chain SBOM evidence. The repository also has successful Dependabot configuration validation; transient Dependabot updater failures caused by the previous incorrect Docker directory were remediated and the corrected configuration was merged and revalidated.
+
+
+## Advanced roadmap completion audit
+
+Phases 1–24 have now been implemented sequentially in the repository, with each promoted phase gated by the full repository CI suite. The final Phase 24 gate intentionally records external proof requirements (pilot/customer production workload and independent validation) as evidence requirements rather than fabricating satisfaction. Repository implementation and CI completion therefore do not by themselves constitute external Enterprise GA certification.
