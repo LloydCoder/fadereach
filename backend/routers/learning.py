@@ -876,6 +876,9 @@ async def experiment_results(
 ):
     db = request.app.state.db
     async with db.acquire() as conn:
+        experiment = await conn.fetchrow("SELECT minimum_sample_size FROM experiments WHERE id=$1 AND tenant_id=$2", experiment_id, auth["sub"])
+        if not experiment:
+            raise HTTPException(404, "Experiment not found")
         rows = await conn.fetch(
             """SELECT variant,
                       COUNT(*) AS exposures,
@@ -900,7 +903,7 @@ async def experiment_results(
             "positive": positive,
             "conversion_rate": positive / exposures if exposures else 0,
             "avg_outcome": float(row["avg_outcome"]) if row["avg_outcome"] is not None else None,
-            "sample_sufficient": exposures >= 30,
+            "sample_sufficient": exposures >= int(experiment["minimum_sample_size"]),
         })
     return {
         "experiment_id": experiment_id,
