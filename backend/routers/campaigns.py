@@ -67,10 +67,10 @@ async def create_campaign(
 
         campaign_id = await conn.fetchval("""
             INSERT INTO campaigns
-            (tenant_id, name, subject, product, target_segment, sequence_steps, status)
-            VALUES ($1,$2,$3,$4,$5,$6,'draft') RETURNING id
+            (tenant_id, name, subject, body_html, product, target_segment, sequence_steps, status)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,'draft') RETURNING id
         """, tenant_id, req.name, req.subject,
-            req.product, req.target_segment, req.sequence_steps)
+            req.body_html, req.product, req.target_segment, req.sequence_steps)
 
     # Auto-run AI Campaign Auditor
     background_tasks.add_task(
