@@ -270,16 +270,16 @@ async def add_domain(
         domain_id = await conn.fetchval("""
             INSERT INTO domains (tenant_id, domain, warmup_status)
             VALUES ($1, $2, 'checking') RETURNING id
-        """, tenant_id, req.domain.lower().strip())
+        """, tenant_id, domain)
 
-    background_tasks.add_task(_verify_and_score_domain, db, domain_id, req.domain.lower().strip(), req.dkim_selector, req.sending_ip)
+    background_tasks.add_task(_verify_and_score_domain, db, domain_id, domain, req.dkim_selector, req.sending_ip)
 
     return {
         "domain_id":  domain_id,
-        "domain":     req.domain,
+        "domain":     domain,
         "status":     "checking",
         "message":    "Domain added. Checking DNS records...",
-        "dns_records_needed": _get_dns_guide(req.domain)
+        "dns_records_needed": _get_dns_guide(domain)
     }
 
 @router.post("/{domain_id}/pause")
