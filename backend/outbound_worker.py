@@ -127,8 +127,8 @@ async def _execute(db, job: dict) -> None:
     async with db.acquire() as conn:
         execution = await conn.fetchrow(
             """
-            SELECT ce.id, ce.tenant_id, ce.campaign_id,
-                   ce.provider_connection_id, c.name, c.subject,
+            SELECT ce.id, ce.tenant_id, ce.campaign_id, ce.cancel_requested,
+                   ce.provider_connection_id, c.name, c.subject, c.status AS campaign_status,
                    c.body_html, pc.base_url, pc.api_username,
                    pc.api_token_ciphertext, pc.from_email
             FROM campaign_executions ce
@@ -143,6 +143,8 @@ async def _execute(db, job: dict) -> None:
         )
         if not execution:
             raise RuntimeError("Execution or provider no longer exists")
+        if execution["cancel_requested"] or execution["campaign_status"] in {"paused", "cancelled"}:
+            raise RuntimeError("Outbound execution cancelled before provider submission")
 
         leads = await conn.fetch(
             """
