@@ -273,10 +273,28 @@ async def send_campaign(
         if not provider:
             raise HTTPException(503, "Configure a Listmonk provider before sending")
         blocked = await conn.fetchval(
-            "SELECT COUNT(*) FROM domains WHERE tenant_id=$1 AND sending_paused=TRUE", tenant_id
+            """
+            SELECT COUNT(*)
+            FROM domains
+            WHERE tenant_id=$1
+              AND (
+                  sending_paused=TRUE
+                  OR spf_valid=FALSE
+                  OR dkim_valid=FALSE
+                  OR dmarc_valid=FALSE
+                  OR mx_valid=FALSE
+                  OR bounce_rate > 1.5
+                  OR complaint_rate > 0.05
+              )
+            """,
+            tenant_id,
         )
         if blocked:
-            raise HTTPException(409, "Sending is paused because one or more sending domains failed deliverability controls")
+            raise HTTPException(
+                409,
+                "Sending is paused because deliverability controls or recent "
+                "bounce/complaint thresholds are not healthy",
+            )
 
         leads = await conn.fetch(
             """SELECT l.id, l.email, l.first_name, l.last_name, l.company, l.ai_first_line
