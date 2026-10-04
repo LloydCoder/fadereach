@@ -23,3 +23,32 @@
 | F17 | final forensic reconciliation |
 
 A phase cannot be documentation-complete if implementation behavior materially contradicts its documentation.
+
+## Advanced product-completion documentation matrix
+
+| Advanced phase | Required documentation |
+|---|---|
+| 1 | Canonical revenue model, data model reconciliation, tenancy/RLS, phase gate |
+| 2 | Evidence ledger, provenance, retention, lineage |
+| 3 | Signal ingestion, source governance, normalization |
+| 4 | Signal convergence, confidence, contradiction handling |
+| 5 | Temporal intelligence, decay, trajectories |
+| 6 | Account graph, entity resolution |
+| 7 | Why-now reasoning and evidence contract |
+| 8 | Opportunity hypotheses and ranking |
+| 9 | Buying committee model |
+| 10 | Account memory and lifecycle |
+| 11 | Revenue intelligence and attribution |
+| 12 | Message intelligence |
+| 13 | Personalization/evidence policy |
+| 14 | AI governance/evaluation |
+| 15 | Autonomy/risk policy |
+| 16 | Queue/execution reliability |
+| 17 | Deliverability control plane |
+| 18 | Provider mesh |
+| 19 | Experimentation/causal learning |
+| 20 | AI red-team/evaluation release gate |
+| 21 | Security/supply chain |
+| 22 | SRE/observability/DR |
+| 23 | Governance/trust/evidence export |
+| 24 | Production certification/GA evidence |
