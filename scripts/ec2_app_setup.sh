@@ -16,7 +16,7 @@ APP_USER=ubuntu
 
 section "1. Clone repo"
 if [ ! -d "$APP_DIR" ]; then
-  git clone https://github.com/Tinlance/fadereach.git $APP_DIR
+  git clone https://github.com/LloydCoder/fadereach.git $APP_DIR
   log "Repo cloned"
 else
   cd $APP_DIR && git pull origin main
