@@ -15,6 +15,7 @@ from tenant_context import tenant_id_context
 from db import TenantAwarePool
 from middleware.security import SecurityHeadersMiddleware, allowed_hosts
 from outbound_worker import run_outbound_worker
+from retention_worker import run_retention_worker
 
 DB_URL      = os.getenv("DATABASE_URL")
 if not DB_URL:
@@ -30,16 +31,20 @@ async def lifespan(app: FastAPI):
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     await _init_db(app.state.db)
     worker_task = asyncio.create_task(run_outbound_worker(app.state.db))
+    retention_task = asyncio.create_task(run_retention_worker(app.state.db))
     app.state.outbound_worker = worker_task
+    app.state.retention_worker = retention_task
     print(f"✓ FadeReach API [{ENVIRONMENT}] → {APP_URL}")
     try:
         yield
     finally:
         worker_task.cancel()
-        try:
-            await worker_task
-        except asyncio.CancelledError:
-            pass
+        retention_task.cancel()
+        for task in (worker_task, retention_task):
+            try:
+                await task
+            except asyncio.CancelledError:
+                pass
         await app.state.db.close()
         await app.state.redis.close()
 
@@ -123,7 +128,7 @@ app.include_router(testing_router.router,   prefix="/api/testing",       tags=["
 # here rather than relying on implicit discovery.
 from routers import (
     auth, campaigns, leads, domains, inbox, analytics, admin, tenants, rbac,
-    webhooks, managed, verticals, whitelabel, ecosystem, public_api, nowpayments, providers, intelligence, integrations, graph, autopilot, enterprise, unsubscribe
+    webhooks, managed, verticals, whitelabel, ecosystem, public_api, nowpayments, providers, intelligence, integrations, graph, autopilot, enterprise, unsubscribe, privacy
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
@@ -137,6 +142,7 @@ app.include_router(tenants.router, prefix="/api/tenants", tags=["Tenants"])
 app.include_router(rbac.router, prefix="/api/rbac", tags=["RBAC"])
 app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
 app.include_router(unsubscribe.router, prefix="/api/unsubscribe", tags=["Unsubscribe"])
+app.include_router(privacy.router, prefix="/api/privacy", tags=["Privacy"])
 app.include_router(managed.router, prefix="/api/managed", tags=["Managed"])
 app.include_router(verticals.router, prefix="/api/verticals", tags=["Verticals"])
 app.include_router(whitelabel.router, prefix="/api/whitelabel", tags=["White Label"])
