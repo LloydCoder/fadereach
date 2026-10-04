@@ -1,4 +1,4 @@
-FROM node:20.19.5-alpine3.22
+FROM node:20.19.5-alpine3.22 AS build
 WORKDIR /app
 COPY package.json ./
 RUN npm install --no-audit --no-fund
