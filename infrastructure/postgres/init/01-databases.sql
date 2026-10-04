@@ -1,2 +1,0 @@
-CREATE DATABASE n8n;
-CREATE DATABASE listmonk_internal;
