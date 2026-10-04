@@ -11,6 +11,7 @@ from signal_convergence import persist_signal_and_convergence
 from temporal_intelligence import persist_trajectory
 from why_now import persist_why_now
 from opportunity_hypothesis import persist_opportunity_hypothesis
+from buying_committee import persist_buying_committee
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -268,9 +269,16 @@ async def ingest_signal(
             await persist_trajectory(conn, tenant_id, organization_id, normalized_type)
             why_now = await persist_why_now(conn, tenant_id, organization_id, account_id)
             opportunity_hypothesis = await persist_opportunity_hypothesis(conn, tenant_id, organization_id, account_id)
+            if opportunity_hypothesis.get("opportunity_id"):
+                buying_committee = await persist_buying_committee(
+                    conn, tenant_id, opportunity_hypothesis["opportunity_id"], organization_id
+                )
+            else:
+                buying_committee = {"status": "unknown", "reason": "no_opportunity"}
         else:
             why_now = {"status": "unknown", "reason": "no_organization"}
             opportunity_hypothesis = {"status": "unknown", "reason": "no_organization"}
+            buying_committee = {"status": "unknown", "reason": "no_organization"}
 
         if account_id:
             account_signal_id = await conn.fetchval(
@@ -337,6 +345,7 @@ async def ingest_signal(
         "demand_hypothesis_id": hypothesis["id"] if hypothesis else None,
         "why_now": why_now,
         "opportunity_hypothesis": opportunity_hypothesis,
+        "buying_committee": buying_committee,
         "status": "accepted",
     }
 
