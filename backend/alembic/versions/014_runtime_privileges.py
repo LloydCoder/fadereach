@@ -27,7 +27,10 @@ def upgrade() -> None:
 
                 ALTER DEFAULT PRIVILEGES IN SCHEMA public
                     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fadereach_runtime;
-                ALTER DEFAULT PRIVILEGES FOR ROLE fadereach IN SCHEMA public
+                -- Apply defaults for objects created by the migration role that
+                -- is executing this migration. Do not hard-code a production
+                -- role name; migration and runtime roles are deployment-configured.
+                ALTER DEFAULT PRIVILEGES IN SCHEMA public
                     GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO fadereach_runtime;
             END IF;
         END
@@ -42,9 +45,9 @@ def downgrade() -> None:
         DO $$
         BEGIN
             IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'fadereach_runtime') THEN
-                ALTER DEFAULT PRIVILEGES FOR ROLE fadereach IN SCHEMA public
+                ALTER DEFAULT PRIVILEGES IN SCHEMA public
                     REVOKE SELECT, INSERT, UPDATE, DELETE ON TABLES FROM fadereach_runtime;
-                ALTER DEFAULT PRIVILEGES FOR ROLE fadereach IN SCHEMA public
+                ALTER DEFAULT PRIVILEGES IN SCHEMA public
                     REVOKE USAGE, SELECT, UPDATE ON SEQUENCES FROM fadereach_runtime;
                 REVOKE SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public FROM fadereach_runtime;
                 REVOKE USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public FROM fadereach_runtime;
