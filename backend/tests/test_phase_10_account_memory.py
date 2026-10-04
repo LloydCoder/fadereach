@@ -10,3 +10,9 @@ def test_account_memory_is_provenance_backed():
 def test_account_memory_is_tenant_isolated():
     assert "account_memory_entries_tenant_isolation" in SOURCE
     assert "FORCE ROW LEVEL SECURITY" in SOURCE
+
+from account_memory import _fingerprint
+
+def test_memory_fingerprint_is_deterministic():
+    assert _fingerprint("signal", {"a": 1}) == _fingerprint("signal", {"a": 1})
+    assert _fingerprint("signal", {"a": 1}) != _fingerprint("signal", {"a": 2})
