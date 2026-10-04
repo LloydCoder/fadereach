@@ -3,6 +3,7 @@ import json
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 from .deps import get_current_tenant
+from audit import record_audit
 
 router = APIRouter()
 
@@ -102,6 +103,7 @@ async def approve_plan(
         )
     if not row:
         raise HTTPException(404, "Autopilot run not found")
+    await record_audit(db, auth["sub"], auth["sub"], "autopilot.approved", f"autopilot:{run_id}")
     return {"run_id": run_id, "status": "approved", "plan": row["plan"]}
 
 
@@ -142,6 +144,7 @@ async def launch_plan(
             campaign["id"], run_id, auth["sub"],
         )
 
+    await record_audit(db, auth["sub"], auth["sub"], "autopilot.launched", f"autopilot:{run_id}", {"campaign_id": campaign["id"]})
     return {
         "run_id": run_id,
         "status": "launched",

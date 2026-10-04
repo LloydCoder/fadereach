@@ -6,6 +6,7 @@ from cryptography.fernet import Fernet, InvalidToken
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr
 from .deps import get_current_tenant
+from audit import record_audit
 
 router = APIRouter()
 
@@ -78,6 +79,7 @@ async def connect_listmonk(
                RETURNING id""",
             auth["sub"], base_url, req.api_username, token, str(req.from_email),
         )
+    await record_audit(db, auth["sub"], auth["sub"], "provider.listmonk.configured", "provider_connection", {"provider_id": row["id"]})
     return {"provider_id": row["id"], "provider": "listmonk", "status": "active"}
 
 
