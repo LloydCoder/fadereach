@@ -10,6 +10,7 @@ import os
 import time
 
 from fastapi import APIRouter, HTTPException, Query, Request
+from tenant_context import tenant_id_context
 
 router = APIRouter()
 
@@ -56,7 +57,9 @@ def _decode_token(token: str) -> dict:
 async def _suppress(request: Request, token: str):
     payload = _decode_token(token)
     db = request.app.state.db
-    async with db.acquire() as conn:
+    token_ctx = tenant_id_context.set(payload["tenant_id"])
+    try:
+        async with db.acquire() as conn:
         await conn.execute(
             """
             INSERT INTO suppression_entries (tenant_id,email,reason,source)
@@ -66,6 +69,8 @@ async def _suppress(request: Request, token: str):
             """,
             payload["tenant_id"], payload["email"],
         )
+    finally:
+        tenant_id_context.reset(token_ctx)
     return {"unsubscribed": True}
 
 
