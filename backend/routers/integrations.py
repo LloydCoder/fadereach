@@ -10,6 +10,7 @@ from tenant_context import tenant_id_context
 from signal_convergence import persist_signal_and_convergence
 from temporal_intelligence import persist_trajectory
 from why_now import persist_why_now
+from opportunity_hypothesis import persist_opportunity_hypothesis
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -266,8 +267,10 @@ async def ingest_signal(
         if organization_id:
             await persist_trajectory(conn, tenant_id, organization_id, normalized_type)
             why_now = await persist_why_now(conn, tenant_id, organization_id, account_id)
+            opportunity_hypothesis = await persist_opportunity_hypothesis(conn, tenant_id, organization_id, account_id)
         else:
             why_now = {"status": "unknown", "reason": "no_organization"}
+            opportunity_hypothesis = {"status": "unknown", "reason": "no_organization"}
 
         if account_id:
             account_signal_id = await conn.fetchval(
@@ -333,6 +336,7 @@ async def ingest_signal(
         "signal_id": row["id"],
         "demand_hypothesis_id": hypothesis["id"] if hypothesis else None,
         "why_now": why_now,
+        "opportunity_hypothesis": opportunity_hypothesis,
         "status": "accepted",
     }
 

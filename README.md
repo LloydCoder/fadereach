@@ -295,6 +295,7 @@ Key references:
 - [Phase 5 — Temporal Intelligence](docs/PHASE_05_TEMPORAL_INTELLIGENCE.md)
 - [Phase 6 — Account Intelligence Graph](docs/PHASE_06_ACCOUNT_GRAPH.md)
 - [Phase 7 — Why-Now Engine](docs/PHASE_07_WHY_NOW.md)
+- [Phase 8 — Opportunity Hypotheses](docs/PHASE_08_OPPORTUNITY_HYPOTHESES.md)
 - [Supply-Chain Evidence](docs/SUPPLY_CHAIN.md)
 
 Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.
