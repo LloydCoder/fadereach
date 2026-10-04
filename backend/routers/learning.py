@@ -28,6 +28,26 @@ class FeedbackReq(BaseModel):
     outcome:       str   # replied | no_reply | bounced | spam
     notes:         Optional[str] = None
 
+class ExperimentReq(BaseModel):
+    name: str
+    hypothesis: str
+    dimension: str
+    variants: list[str]
+    primary_metric: str
+    minimum_sample_size: int = 100
+
+
+class ExposureReq(BaseModel):
+    subject_type: str
+    subject_id: str
+    variant: str
+
+
+class OutcomeReq(BaseModel):
+    outcome: str
+    outcome_value: float | None = None
+
+
 class OptimizationInsight(BaseModel):
     insight_type: str
     segment:      str
@@ -749,3 +769,144 @@ Write 2 sentences of plain-English insight for the founder. Be specific and acti
         return resp.json()["content"][0]["text"].strip()
     except:
         return None
+
+
+@router.post("/experiments")
+async def create_experiment(
+    req: ExperimentReq,
+    request: Request,
+    auth: dict = Depends(get_current_tenant),
+):
+    if not 2 <= len(req.variants) <= 5 or len(set(req.variants)) != len(req.variants):
+        raise HTTPException(400, "Experiments require 2-5 unique variants")
+    if req.minimum_sample_size < 30:
+        raise HTTPException(400, "Minimum sample size must be at least 30")
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            """INSERT INTO experiments
+               (tenant_id,name,hypothesis,dimension,status,variants,primary_metric,minimum_sample_size)
+               VALUES ($1,$2,$3,$4,'draft',$5::jsonb,$6,$7)
+               RETURNING id,status,created_at""",
+            auth["sub"], req.name, req.hypothesis, req.dimension,
+            json.dumps(req.variants), req.primary_metric,
+            req.minimum_sample_size,
+        )
+    return dict(row)
+
+
+@router.post("/experiments/{experiment_id}/start")
+async def start_experiment(
+    experiment_id: int,
+    request: Request,
+    auth: dict = Depends(get_current_tenant),
+):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            """UPDATE experiments SET status='running', updated_at=NOW()
+               WHERE id=$1 AND tenant_id=$2 AND status='draft'
+               RETURNING id,status""",
+            experiment_id, auth["sub"],
+        )
+    if not row:
+        raise HTTPException(404, "Experiment not found or already started")
+    return dict(row)
+
+
+@router.post("/experiments/{experiment_id}/exposures")
+async def record_exposure(
+    experiment_id: int,
+    req: ExposureReq,
+    request: Request,
+    auth: dict = Depends(get_current_tenant),
+):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        experiment = await conn.fetchrow(
+            "SELECT variants,status FROM experiments WHERE id=$1 AND tenant_id=$2",
+            experiment_id, auth["sub"],
+        )
+        if not experiment or experiment["status"] != "running":
+            raise HTTPException(409, "Experiment is not running")
+        if req.variant not in experiment["variants"]:
+            raise HTTPException(400, "Unknown experiment variant")
+        row = await conn.fetchrow(
+            """INSERT INTO experiment_exposures
+               (tenant_id,experiment_id,subject_type,subject_id,variant)
+               VALUES ($1,$2,$3,$4,$5)
+               ON CONFLICT (experiment_id,subject_type,subject_id) DO NOTHING
+               RETURNING id,variant,exposed_at""",
+            auth["sub"], experiment_id, req.subject_type,
+            req.subject_id, req.variant,
+        )
+    if not row:
+        raise HTTPException(409, "Subject was already exposed")
+    return dict(row)
+
+
+@router.post("/experiments/{experiment_id}/exposures/{exposure_id}/outcome")
+async def record_experiment_outcome(
+    experiment_id: int,
+    exposure_id: int,
+    req: OutcomeReq,
+    request: Request,
+    auth: dict = Depends(get_current_tenant),
+):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            """UPDATE experiment_exposures
+               SET outcome=$1, outcome_value=$2, outcome_at=NOW()
+               WHERE id=$3 AND experiment_id=$4 AND tenant_id=$5
+               RETURNING id,outcome,outcome_value,outcome_at""",
+            req.outcome, req.outcome_value, exposure_id,
+            experiment_id, auth["sub"],
+        )
+    if not row:
+        raise HTTPException(404, "Exposure not found")
+    return dict(row)
+
+
+@router.get("/experiments/{experiment_id}/results")
+async def experiment_results(
+    experiment_id: int,
+    request: Request,
+    auth: dict = Depends(get_current_tenant),
+):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        experiment = await conn.fetchrow("SELECT minimum_sample_size FROM experiments WHERE id=$1 AND tenant_id=$2", experiment_id, auth["sub"])
+        if not experiment:
+            raise HTTPException(404, "Experiment not found")
+        rows = await conn.fetch(
+            """SELECT variant,
+                      COUNT(*) AS exposures,
+                      COUNT(*) FILTER (WHERE outcome IS NOT NULL) AS measured,
+                      COUNT(*) FILTER (
+                          WHERE outcome IN ('qualified','meeting','opportunity','won')
+                      ) AS positive,
+                      AVG(outcome_value) FILTER (WHERE outcome_value IS NOT NULL) AS avg_outcome
+               FROM experiment_exposures
+               WHERE experiment_id=$1 AND tenant_id=$2
+               GROUP BY variant ORDER BY variant""",
+            experiment_id, auth["sub"],
+        )
+    results = []
+    for row in rows:
+        exposures = int(row["exposures"])
+        positive = int(row["positive"])
+        results.append({
+            "variant": row["variant"],
+            "exposures": exposures,
+            "measured": int(row["measured"]),
+            "positive": positive,
+            "conversion_rate": positive / exposures if exposures else 0,
+            "avg_outcome": float(row["avg_outcome"]) if row["avg_outcome"] is not None else None,
+            "sample_sufficient": exposures >= int(experiment["minimum_sample_size"]),
+        })
+    return {
+        "experiment_id": experiment_id,
+        "results": results,
+        "interpretation": "Descriptive only until pre-registered sample and statistical decision rules are met.",
+    }
