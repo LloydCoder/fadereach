@@ -23,10 +23,16 @@ POLL_SECONDS = float(os.getenv("OUTBOUND_WORKER_POLL_SECONDS", "2"))
 LOCK_TIMEOUT_MINUTES = int(os.getenv("OUTBOUND_JOB_LOCK_TIMEOUT_MINUTES", "15"))
 
 
-async def run_outbound_worker(db) -> None:
+async def run_outbound_worker(db, queue_db=None) -> None:
+    """Run durable outbound work with a narrowly privileged queue connection.
+
+    queue_db is allowed to bypass RLS only for claiming execution_jobs. All
+    tenant-owned work continues through the tenant-aware application pool.
+    """
+    queue_db = queue_db or db
     while True:
         try:
-            job = await _claim_job(db)
+            job = await _claim_job(queue_db)
             if job:
                 await _run_job(db, job)
             else:
