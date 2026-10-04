@@ -7,6 +7,8 @@ from .deps import get_current_tenant
 import httpx, os
 from datetime import datetime
 from typing import Optional
+from .providers import get_listmonk_connection
+from tenant_context import tenant_id_context
 
 router = APIRouter()
 CLAUDE_KEY = os.getenv("CLAUDE_API_KEY", "")
@@ -65,10 +67,10 @@ async def create_campaign(
 
         campaign_id = await conn.fetchval("""
             INSERT INTO campaigns
-            (tenant_id, name, subject, product, target_segment, sequence_steps, status)
-            VALUES ($1,$2,$3,$4,$5,$6,'draft') RETURNING id
+            (tenant_id, name, subject, body_html, product, target_segment, sequence_steps, status)
+            VALUES ($1,$2,$3,$4,$5,$6,$7,'draft') RETURNING id
         """, tenant_id, req.name, req.subject,
-            req.product, req.target_segment, req.sequence_steps)
+            req.body_html, req.product, req.target_segment, req.sequence_steps)
 
     # Auto-run AI Campaign Auditor
     background_tasks.add_task(
@@ -238,6 +240,79 @@ async def list_campaigns(
         """, auth["sub"])
     return {"campaigns": [dict(r) for r in rows]}
 
+@router.post("/{campaign_id}/send")
+async def send_campaign(
+    campaign_id: int,
+    background_tasks: BackgroundTasks,
+    request: Request,
+    auth: dict = Depends(get_current_tenant),
+):
+    """Validate, queue and submit a campaign to the configured Listmonk adapter."""
+    db = request.app.state.db
+    tenant_id = auth["sub"]
+
+    async with db.acquire() as conn:
+        campaign = await conn.fetchrow(
+            """SELECT id, name, subject, status, body_html, audit_score
+               FROM campaigns WHERE id=$1 AND tenant_id=$2""",
+            campaign_id, tenant_id,
+        )
+        if not campaign:
+            raise HTTPException(404, "Campaign not found")
+        if campaign["status"] not in {"draft", "paused"}:
+            raise HTTPException(409, f"Campaign cannot be sent from status '{campaign['status']}'")
+        if campaign["audit_score"] is None or campaign["audit_score"] < 70:
+            raise HTTPException(409, "Campaign must pass the send-readiness audit (score >= 70)")
+        provider = await conn.fetchrow(
+            """SELECT id, base_url, api_username, api_token_ciphertext, from_email
+               FROM provider_connections
+               WHERE tenant_id=$1 AND provider_type='listmonk' AND status='active'""",
+            tenant_id,
+        )
+        if not provider:
+            raise HTTPException(503, "Configure a Listmonk provider before sending")
+
+        leads = await conn.fetch(
+            """SELECT l.id, l.email, l.first_name, l.last_name, l.company, l.ai_first_line
+               FROM leads l
+               WHERE l.tenant_id=$1
+                 AND l.status NOT IN ('replied','replied_positive','unsubscribed','bounced')
+                 AND NOT EXISTS (
+                     SELECT 1 FROM suppression_entries s
+                     WHERE s.tenant_id=l.tenant_id AND lower(s.email)=lower(l.email)
+                 )
+               ORDER BY l.id
+               LIMIT 10000""",
+            tenant_id,
+        )
+        if not leads:
+            raise HTTPException(409, "No eligible recipients remain after suppression and status checks")
+
+        execution = await conn.fetchrow(
+            """INSERT INTO campaign_executions
+               (tenant_id, campaign_id, provider_connection_id, status, recipient_count)
+               VALUES ($1,$2,$3,'queued',$4)
+               ON CONFLICT (campaign_id)
+               DO UPDATE SET status='queued', recipient_count=EXCLUDED.recipient_count,
+                             error_message=NULL, started_at=NULL, completed_at=NULL
+               RETURNING id""",
+            tenant_id, campaign_id, provider["id"], len(leads),
+        )
+
+    background_tasks.add_task(
+        _execute_listmonk_campaign,
+        db, execution["id"], tenant_id, campaign_id,
+        [dict(row) for row in leads],
+        dict(provider), campaign["name"], campaign["subject"], campaign["body_html"],
+    )
+    return {
+        "campaign_id": campaign_id,
+        "execution_id": execution["id"],
+        "status": "queued",
+        "recipient_count": len(leads),
+    }
+
+
 @router.post("/{campaign_id}/pause")
 async def pause_campaign(
     campaign_id: int,
@@ -279,6 +354,145 @@ async def resume_campaign(
             campaign_id
         )
     return {"campaign_id": campaign_id, "status": "active"}
+
+async def _execute_listmonk_campaign(
+    db, execution_id: int, tenant_id: str, campaign_id: int,
+    leads: list[dict], provider: dict, campaign_name: str,
+    subject: str, body_html: str,
+):
+    """Submit one idempotent campaign to Listmonk; delivery is tracked separately."""
+    token = tenant_id_context.set(tenant_id)
+    try:
+        async with db.acquire() as conn:
+            await conn.execute(
+                "UPDATE campaign_executions SET status='running', started_at=NOW() WHERE id=$1",
+                execution_id,
+            )
+
+        auth = (provider["api_username"], await _decrypt_provider_token(provider["api_token_ciphertext"]))
+        base = provider["base_url"].rstrip("/")
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            list_resp = await client.post(
+                f"{base}/api/lists",
+                auth=auth,
+                json={
+                    "name": f"FadeReach {campaign_name} #{execution_id}",
+                    "type": "private",
+                    "optin": "single",
+                    "status": "active",
+                },
+            )
+            if list_resp.status_code >= 300:
+                raise RuntimeError(f"Listmonk list creation failed: HTTP {list_resp.status_code}")
+            list_id = list_resp.json()["data"]["id"]
+
+            eligible = 0
+            for lead in leads:
+                first = lead.get("first_name") or ""
+                last = lead.get("last_name") or ""
+                name = " ".join(x for x in [first, last] if x).strip() or lead["email"]
+                resp = await client.post(
+                    f"{base}/api/subscribers",
+                    auth=auth,
+                    json={
+                        "email": lead["email"],
+                        "name": name,
+                        "status": "enabled",
+                        "lists": [list_id],
+                        "preconfirm_subscriptions": True,
+                        "attribs": {
+                            "company": lead.get("company") or "",
+                            "ai_first_line": lead.get("ai_first_line") or "",
+                            "fade_reach_lead_id": lead["id"],
+                        },
+                    },
+                )
+                if resp.status_code >= 300:
+                    raise RuntimeError(f"Listmonk subscriber creation failed: HTTP {resp.status_code}")
+                eligible += 1
+
+            body = _to_listmonk_template(body_html)
+            create = await client.post(
+                f"{base}/api/campaigns",
+                auth=auth,
+                json={
+                    "name": f"FadeReach {campaign_name} #{execution_id}",
+                    "subject": subject,
+                    "lists": [list_id],
+                    "from_email": provider["from_email"],
+                    "content_type": "html",
+                    "messenger": "email",
+                    "type": "regular",
+                    "body": body,
+                },
+            )
+            if create.status_code >= 300:
+                raise RuntimeError(f"Listmonk campaign creation failed: HTTP {create.status_code}")
+            external_id = create.json()["data"]["id"]
+
+            start = await client.put(
+                f"{base}/api/campaigns/{external_id}/status",
+                auth=auth,
+                json={"status": "running"},
+            )
+            if start.status_code >= 300:
+                raise RuntimeError(f"Listmonk campaign start failed: HTTP {start.status_code}")
+
+        async with db.acquire() as conn:
+            await conn.execute(
+                """UPDATE campaign_executions
+                   SET status='succeeded', external_campaign_id=$1,
+                       sent_count=0, completed_at=NOW()
+                   WHERE id=$2""",
+                external_id, execution_id,
+            )
+            await conn.execute(
+                """UPDATE campaigns SET status='active', updated_at=NOW() WHERE id=$1 AND tenant_id=$2""",
+                campaign_id, tenant_id,
+            )
+            await conn.executemany(
+                """INSERT INTO messages
+                   (tenant_id, campaign_id, execution_id, lead_id, recipient_email, subject, status, sent_at)
+                   VALUES ($1,$2,$3,$4,$5,$6,'submitted',NOW())""",
+                [
+                    (tenant_id, campaign_id, execution_id, lead["id"], lead["email"], subject)
+                    for lead in leads
+                ],
+            )
+    except Exception as exc:
+        async with db.acquire() as conn:
+            await conn.execute(
+                """UPDATE campaign_executions
+                   SET status='failed', error_count=recipient_count,
+                       error_message=$1, completed_at=NOW()
+                   WHERE id=$2""",
+                str(exc)[:1000], execution_id,
+            )
+    finally:
+        tenant_id_context.reset(token)
+
+
+async def _decrypt_provider_token(ciphertext: str) -> str:
+    from cryptography.fernet import Fernet
+    key = os.getenv("CREDENTIAL_ENCRYPTION_KEY", "")
+    if not key:
+        raise RuntimeError("Credential encryption is not configured")
+    return Fernet(key.encode()).decrypt(ciphertext.encode()).decode()
+
+
+def _to_listmonk_template(body: str) -> str:
+    replacements = {
+        "{{first_name}}": "{{ .Subscriber.FirstName }}",
+        "{first_name}": "{{ .Subscriber.FirstName }}",
+        "{{company}}": "{{ .Subscriber.Attribs.company }}",
+        "{company}": "{{ .Subscriber.Attribs.company }}",
+        "{{ai_first_line}}": "{{ .Subscriber.Attribs.ai_first_line }}",
+        "{ai_first_line}": "{{ .Subscriber.Attribs.ai_first_line }}",
+    }
+    for source, target in replacements.items():
+        body = body.replace(source, target)
+    return body
+
 
 # ── Internal helpers ────────────────────────────
 async def _run_campaign_audit(db, campaign_id: int, subject: str, body: str):

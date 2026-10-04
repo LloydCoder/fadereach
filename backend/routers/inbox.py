@@ -204,6 +204,15 @@ async def ingest_reply(
                     req.campaign_id, tenant_id,
                 )
 
+            if intent == "not_interested":
+                await conn.execute(
+                    """INSERT INTO suppression_entries (tenant_id, email, reason, source)
+                       VALUES ($1,$2,'unsubscribe_or_not_interested','reply')
+                       ON CONFLICT (tenant_id,email) DO UPDATE
+                       SET reason=EXCLUDED.reason, source=EXCLUDED.source""",
+                    tenant_id, req.from_email.lower(),
+                )
+
             # Save reply
             reply_id = await conn.fetchval("""
                 INSERT INTO replies
