@@ -62,6 +62,7 @@ TADS and SDEA provide upstream demand/account intelligence. FadeReach converts v
 44. [Phase 8 — Opportunity Hypotheses](PHASE_08_OPPORTUNITY_HYPOTHESES.md)
 45. [Phase 9 — Buying Committee](PHASE_09_BUYING_COMMITTEE.md)
 46. [Phase 10 — Account Memory](PHASE_10_ACCOUNT_MEMORY.md)
+47. [Phase 11 — Revenue Intelligence](PHASE_11_REVENUE_INTELLIGENCE.md)
 
 ## Advanced enterprise phase sequence
 
