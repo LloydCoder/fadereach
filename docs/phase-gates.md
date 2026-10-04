@@ -20,7 +20,15 @@ A green workflow is necessary evidence, not proof of external production readine
 - **F3 — Security hardening — merged; main CI green**
 - F4 — Durable outbound execution — merged; main CI green
 - F5 — Deliverability control plane — merged; main CI green
-- **F6 — Compliance & data governance — implementation in review; CI gate pending**
+- F6 — Compliance & data governance — merged; main CI green
+- F7 — Intelligence engine — previously merged; revalidated by current CI baseline
+- F8 — TADS/SDEA integration — previously merged; revalidated by current CI baseline
+- F9 — Outbound Intelligence Graph — previously merged; revalidated by current CI baseline
+- F10 — Campaign Autopilot — previously merged; revalidated by current CI baseline
+- F11 — Learning & revenue attribution — previously merged; revalidated by current CI baseline
+- F12 — Agency platform — previously merged; revalidated by current CI baseline
+- F13 — Enterprise platform — previously merged; revalidated by current CI baseline
+- **F14 — Reliability, observability & DR — implementation in review; CI gate pending**
 - F3 — Security hardening
 - F4 — Durable outbound execution
 - F5 — Deliverability control plane
