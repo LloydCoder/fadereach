@@ -48,11 +48,7 @@ POSTGRES_RUNTIME_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32
 N8N_DB_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 LISTMONK_DB_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 JWT_SECRET=$(openssl rand -base64 64 | tr -d '=+/\n' | cut -c1-64)
-CREDENTIAL_ENCRYPTION_KEY=$(python3 - <<'PY'
-from cryptography.fernet import Fernet
-print(Fernet.generate_key().decode())
-PY
-)
+CREDENTIAL_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n')
 N8N_ENCRYPTION_KEY=$(openssl rand -hex 32)
 LISTMONK_ADMIN_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 EOF
