@@ -7,12 +7,14 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
+import asyncio
 import asyncpg, redis.asyncio as aioredis
 import os
 from datetime import datetime
 from tenant_context import tenant_id_context
 from db import TenantAwarePool
 from middleware.security import SecurityHeadersMiddleware, allowed_hosts
+from outbound_worker import run_outbound_worker
 
 DB_URL      = os.getenv("DATABASE_URL")
 if not DB_URL:
@@ -27,10 +29,19 @@ async def lifespan(app: FastAPI):
     app.state.db = TenantAwarePool(raw_db)
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     await _init_db(app.state.db)
+    worker_task = asyncio.create_task(run_outbound_worker(app.state.db))
+    app.state.outbound_worker = worker_task
     print(f"✓ FadeReach API [{ENVIRONMENT}] → {APP_URL}")
-    yield
-    await app.state.db.close()
-    await app.state.redis.close()
+    try:
+        yield
+    finally:
+        worker_task.cancel()
+        try:
+            await worker_task
+        except asyncio.CancelledError:
+            pass
+        await app.state.db.close()
+        await app.state.redis.close()
 
 app = FastAPI(
     title="FadeReach API",
