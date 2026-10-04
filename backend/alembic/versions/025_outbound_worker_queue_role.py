@@ -15,6 +15,9 @@ depends_on = None
 def upgrade() -> None:
     op.execute(
         """
+        ALTER TABLE campaign_executions
+            ADD COLUMN IF NOT EXISTS cancel_requested BOOLEAN NOT NULL DEFAULT FALSE;
+
         DO $$
         BEGIN
             IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'fadereach_worker') THEN
