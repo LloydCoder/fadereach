@@ -177,6 +177,12 @@ async def _execute(db, job: dict) -> None:
             FROM leads l
             WHERE l.tenant_id=$1
               AND l.status NOT IN ('replied','replied_positive','unsubscribed','bounced')
+              AND COALESCE(l.lawful_basis, '') NOT IN ('', 'unknown')
+              AND l.objection_status <> 'objected'
+              AND (
+                  l.subscriber_type = 'corporate'
+                  OR (l.subscriber_type IN ('individual','sole_trader','partnership') AND l.consent_status = 'consented')
+              )
               AND NOT EXISTS (
                   SELECT 1 FROM suppression_entries s
                   WHERE s.tenant_id=l.tenant_id
