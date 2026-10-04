@@ -1,0 +1,5 @@
+"""Phase 24 enterprise GA certification gate."""
+from alembic import op
+revision="049_enterprise_ga"; down_revision="048_governance_evidence"; branch_labels=None; depends_on=None
+def upgrade(): op.execute("""CREATE TABLE IF NOT EXISTS enterprise_ga_evidence (id BIGSERIAL PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,gate_code TEXT NOT NULL,required BOOLEAN NOT NULL DEFAULT TRUE,status TEXT NOT NULL CHECK(status IN('pending','satisfied','waived','blocked')),evidence_refs JSONB NOT NULL DEFAULT '[]'::jsonb,notes TEXT,verified_at TIMESTAMPTZ,verified_by TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),UNIQUE(tenant_id,gate_code)); ALTER TABLE enterprise_ga_evidence ENABLE ROW LEVEL SECURITY; ALTER TABLE enterprise_ga_evidence FORCE ROW LEVEL SECURITY; CREATE POLICY enterprise_ga_evidence_tenant_isolation ON enterprise_ga_evidence USING(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));""")
+def downgrade(): op.execute("DROP TABLE IF EXISTS enterprise_ga_evidence CASCADE")
