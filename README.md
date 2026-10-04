@@ -260,3 +260,25 @@ See the repository license and third-party dependency notices before distributio
 
 **Tinlance Limited**  
 FadeReach — AI Outbound Revenue OS
+
+
+## Documentation
+
+The authoritative engineering, security, operations, compliance and product documentation is indexed in [docs/README.md](docs/README.md).
+
+Key references:
+- [Architecture](docs/ARCHITECTURE.md)
+- [Security](docs/SECURITY.md)
+- [Threat Model](docs/THREAT_MODEL.md)
+- [Data Model](docs/DATA_MODEL.md)
+- [API Contract](docs/API.md)
+- [Deployment](docs/DEPLOYMENT.md)
+- [Operations Runbook](docs/OPERATIONS_RUNBOOK.md)
+- [Disaster Recovery](docs/DISASTER_RECOVERY.md)
+- [Deliverability](docs/DELIVERABILITY.md)
+- [Compliance](docs/COMPLIANCE.md)
+- [Intelligence Model](docs/INTELLIGENCE_MODEL.md)
+- [Autonomy Governance](docs/AUTONOMY_GOVERNANCE.md)
+- [Production Readiness](docs/PRODUCTION_READINESS.md)
+
+Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.
