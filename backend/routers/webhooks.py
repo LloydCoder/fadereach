@@ -187,6 +187,7 @@ async def paddle_webhook(
     except ValueError:
         raise HTTPException(401, "Invalid Paddle webhook timestamp")
     obj        = data.get("data", {})
+    db         = request.app.state.db
 
     # Extract email from customer object
     email    = obj.get("customer", {}).get("email", "") or \
@@ -283,14 +284,20 @@ async def _handle_one_time_purchase(db, email: str, product_id: str, provider: s
     pass
 
 async def _log_billing(db, email: str, event: str, provider: str, amount: float, raw: dict):
+    from tenant_context import tenant_id_context
     async with db.acquire() as conn:
         tenant = await conn.fetchrow("SELECT id FROM tenants WHERE email=$1", email)
-        if tenant:
+        if not tenant:
+            return
+        token = tenant_id_context.set(str(tenant["id"]))
+        try:
             await conn.execute("""
                 INSERT INTO billing_events
                 (tenant_id, event_type, provider, amount, currency, metadata)
                 VALUES ($1,$2,$3,$4,'USD',$5)
             """, tenant["id"], event, provider, amount, json.dumps(raw))
+        finally:
+            tenant_id_context.reset(token)
 
 # ── Email notifications via Resend ──────────────
 async def _send_plan_email(email: str, name: str, plan: str,
