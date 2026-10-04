@@ -61,7 +61,8 @@ jobs:
             test -f .env
 
             docker compose --env-file .env config --quiet
-            docker compose --env-file .env build --pull api frontend
+            docker compose --env-file .env build --pull api worker frontend
+            docker compose --env-file .env run --rm --no-deps api alembic upgrade head
             docker compose --env-file .env up -d --remove-orphans
 
             docker compose --env-file .env ps
