@@ -13,6 +13,7 @@ services:
       APP_URL: https://fadereach.app
       DATABASE_URL: postgresql://fadereach_runtime:${POSTGRES_RUNTIME_PASSWORD}@postgres:5432/fadereach_meta
       JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY}
       REDIS_URL: redis://redis:6379/0
       HUNTER_API_KEY: ${HUNTER_API_KEY:-}
       ZEROBOUNCE_API_KEY: ${ZEROBOUNCE_API_KEY:-}
