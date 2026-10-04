@@ -45,6 +45,44 @@ services:
       retries: 5
       start_period: 30s
 
+  worker:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    command: ["python", "-m", "worker"]
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql://fadereach_runtime:${POSTGRES_RUNTIME_PASSWORD}@postgres:5432/fadereach_meta
+      WORKER_DATABASE_URL: postgresql://fadereach_worker:${POSTGRES_WORKER_PASSWORD}@postgres:5432/fadereach_meta
+      MIGRATION_DATABASE_URL: postgresql://fadereach:${POSTGRES_PASSWORD}@postgres:5432/fadereach_meta
+      JWT_SECRET: ${JWT_SECRET}
+      CREDENTIAL_ENCRYPTION_KEY: ${CREDENTIAL_ENCRYPTION_KEY}
+      UNSUBSCRIBE_SECRET: ${UNSUBSCRIBE_SECRET}
+      REDIS_URL: redis://redis:6379/0
+      HUNTER_API_KEY: ${HUNTER_API_KEY:-}
+      ZEROBOUNCE_API_KEY: ${ZEROBOUNCE_API_KEY:-}
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY:-}
+      LEMONSQUEEZY_WEBHOOK_SECRET: ${LEMONSQUEEZY_WEBHOOK_SECRET:-}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      PADDLE_WEBHOOK_SECRET: ${PADDLE_WEBHOOK_SECRET:-}
+      N8N_WEBHOOK_URL: http://n8n:5678/webhook
+      FADEREACH_API_URL: http://api:8000
+      SIGNAL_INGEST_SECRET: ${SIGNAL_INGEST_SECRET}
+      FADE_REACH_AUTONOMY_ENABLED: ${FADE_REACH_AUTONOMY_ENABLED:-false}
+      AGENT_PLATFORM_BASE_URL: ${AGENT_PLATFORM_BASE_URL:-}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    volumes:
+      - /opt/fadereach/tenants:/opt/fadereach/tenants
+    networks: [fadereach-net]
+
   frontend:
     build:
       context: ./frontend
