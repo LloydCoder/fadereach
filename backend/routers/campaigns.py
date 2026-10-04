@@ -9,6 +9,7 @@ from datetime import datetime
 from typing import Optional
 from .providers import get_listmonk_connection
 from tenant_context import tenant_id_context
+from audit import record_audit
 
 router = APIRouter()
 CLAUDE_KEY = os.getenv("CLAUDE_API_KEY", "")
@@ -310,6 +311,7 @@ async def send_campaign(
         [dict(row) for row in leads],
         dict(provider), campaign["name"], campaign["subject"], campaign["body_html"],
     )
+    await record_audit(db, tenant_id, tenant_id, "campaign.send.queued", f"campaign:{campaign_id}", {"execution_id": execution["id"], "recipient_count": len(leads)})
     return {
         "campaign_id": campaign_id,
         "execution_id": execution["id"],
