@@ -58,6 +58,7 @@ TADS and SDEA provide upstream demand/account intelligence. FadeReach converts v
 40. [Phase 4 — Signal Convergence](PHASE_04_SIGNAL_CONVERGENCE.md)
 41. [Phase 5 — Temporal Intelligence](PHASE_05_TEMPORAL_INTELLIGENCE.md)
 42. [Phase 6 — Account Intelligence Graph](PHASE_06_ACCOUNT_GRAPH.md)
+43. [Phase 7 — Why-Now Engine](PHASE_07_WHY_NOW.md)
 
 ## Advanced enterprise phase sequence
 

@@ -9,6 +9,7 @@ from .deps import get_current_tenant
 from tenant_context import tenant_id_context
 from signal_convergence import persist_signal_and_convergence
 from temporal_intelligence import persist_trajectory
+from why_now import persist_why_now
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -214,7 +215,7 @@ async def ingest_signal(
             normalized_type, signal_category, freshness_days, raw_payload_hash,
         )
 
-        await persist_signal_and_convergence(
+        convergence = await persist_signal_and_convergence(
             conn,
             tenant_id,
             organization_id,
@@ -233,8 +234,40 @@ async def ingest_signal(
             _source_trust_tier(source),
         )
 
+        for evidence_item in evidence:
+            evidence_hash = hashlib.sha256(
+                json.dumps(evidence_item, sort_keys=True, separators=(",", ":")).encode()
+            ).hexdigest()
+            evidence_id = await conn.fetchval(
+                """INSERT INTO evidence
+                   (tenant_id, source, source_ref, source_url, claim, evidence_type,
+                    observed_at, quality, confidence, content_hash, provenance)
+                   VALUES ($1,$2,$3,$4,$5,'observation',COALESCE($6,NOW()),$7,$8,$9,$10::jsonb)
+                   RETURNING id""",
+                tenant_id,
+                str(evidence_item.get("source")),
+                evidence_item.get("source_ref") or external_id,
+                evidence_item.get("source_url") or source_url,
+                str(evidence_item.get("claim")),
+                evidence_item.get("observed_at") or observed_at,
+                max(0.0, min(1.0, float(evidence_item.get("quality", 0.8)))),
+                max(0.0, min(1.0, float(evidence_item.get("confidence", min(0.95, 0.50 + score / 200))))),
+                evidence_hash,
+                json.dumps({"ingest_source": source, "external_id": external_id}),
+            )
+            await conn.execute(
+                """INSERT INTO signal_evidence(signal_id, evidence_id, contribution)
+                   VALUES ($1,$2,$3)
+                   ON CONFLICT (signal_id, evidence_id)
+                   DO UPDATE SET contribution=EXCLUDED.contribution""",
+                convergence["signal_id"], evidence_id, score / 100,
+            )
+
         if organization_id:
             await persist_trajectory(conn, tenant_id, organization_id, normalized_type)
+            why_now = await persist_why_now(conn, tenant_id, organization_id, account_id)
+        else:
+            why_now = {"status": "unknown", "reason": "no_organization"}
 
         if account_id:
             account_signal_id = await conn.fetchval(
@@ -299,6 +332,7 @@ async def ingest_signal(
     return {
         "signal_id": row["id"],
         "demand_hypothesis_id": hypothesis["id"] if hypothesis else None,
+        "why_now": why_now,
         "status": "accepted",
     }
 

@@ -60,6 +60,15 @@ async def get_account_graph(
                ORDER BY updated_at DESC LIMIT 100""",
             tenant_id, account["id"],
         )
+        why_now = await conn.fetchrow(
+            """SELECT id, what_changed, when_changed, why_matters, why_now,
+                      capability_required, confidence, unknowns, evidence_refs,
+                      signal_cluster_ids, trajectory_states, status, evaluated_at
+               FROM why_now_assessments
+               WHERE tenant_id=$1 AND account_id=$2
+               ORDER BY evaluated_at DESC LIMIT 1""",
+            tenant_id, account["id"],
+        )
         edges = await conn.fetch(
             """SELECT id, source_type, source_id, target_type, target_id, relation,
                       confidence, evidence_id, valid_from, valid_to, metadata
@@ -87,6 +96,7 @@ async def get_account_graph(
         "initiatives": [dict(row) for row in initiatives],
         "opportunities": [dict(row) for row in opportunities],
         "edges": [dict(row) for row in edges],
+        "why_now": dict(why_now) if why_now else None,
         "graph_semantics": {
             "account": "company/entity",
             "people": "buyer/contact",
