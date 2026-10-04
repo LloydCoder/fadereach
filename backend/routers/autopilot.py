@@ -64,14 +64,7 @@ async def create_plan(
             "targets": targets,
             "message_strategy": {
                 "subject": "Quick question about {{company}}",
-                "body": "Hi {{first_name}},
-
-{{ai_first_line}}
-
-Would it be useful to compare notes on {{company}}'s current priorities?
-
-Best,
-Tinlance",
+                "body": "Hi {{first_name}},\n\n{{ai_first_line}}\n\nWould it be useful to compare notes on {{company}}\'s current priorities?\n\nBest,\nTinlance"",
                 "cta": "single low-friction reply CTA",
             },
             "gates": {
