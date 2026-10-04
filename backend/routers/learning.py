@@ -1,7 +1,7 @@
 """
 FadeReach — Self-Learning Engine
 RLHF-lite feedback loop · Pattern recognition
-Weekly optimization cron · Africa-specific intelligence
+Weekly optimization cron · market-specific intelligence
 
 The system learns what YOUR market responds to.
 After 90 days: knows best send times for Nigerian fintechs,
@@ -269,7 +269,7 @@ async def get_recommendations(
     recommendations = {
         "send_time":      send_time_rec or "Tuesday–Thursday, 08:00–10:00 local time",
         "sequence_length": 4,
-        "sequence_note":  "58% of replies come from email 1. Steps 2-4 catch the remaining 42%.",
+        "sequence_note":  "Use measured step-level reply and qualification outcomes; do not assume a universal sequence conversion split.",
         "subject_tips": [
             "Keep under 45 characters",
             "Avoid question marks in subject — use in body CTA instead",
@@ -281,7 +281,7 @@ async def get_recommendations(
             "Do not start with 'I' or 'We'",
             "Sound like a colleague, not a vendor",
         ],
-        "optimal_volume":  "Max 100 emails/day per mailbox — never exceed this",
+        "optimal_volume":  "Use the sending-domain and mailbox limits shown by the deliverability control plane.",
         "bounce_target":   "Keep bounce rate under 1.5% — pause at 2%",
         "data_powered":    bool(stats["total_campaigns"]),
         "campaigns_analyzed": int(stats["total_campaigns"] or 0),
@@ -305,25 +305,16 @@ async def _run_weekly_optimization(db, redis, tenant_id: str):
     async with db.acquire() as conn:
         # Find underperforming subject line patterns
         poor_performers = await conn.fetch("""
-            SELECT subject, reply_rate
+            SELECT subject,
+                   CASE WHEN emails_sent > 0 THEN replies::numeric / emails_sent * 100 ELSE 0 END AS reply_rate
             FROM campaigns
             WHERE tenant_id=$1
             AND emails_sent > 50
-            AND reply_rate < 2.0
+            AND (replies::numeric / NULLIF(emails_sent,0) * 100) < 2.0
             AND created_at < NOW() - INTERVAL '14 days'
         """, tenant_id)
 
-        # Store optimization log
-        await conn.execute("""
-            CREATE TABLE IF NOT EXISTS optimization_log (
-                id          SERIAL PRIMARY KEY,
-                tenant_id   TEXT NOT NULL,
-                run_at      TIMESTAMPTZ DEFAULT NOW(),
-                insights    JSONB,
-                actions     JSONB
-            );
-        """)
-
+        # Persist optimization evidence; schema is migration-managed.
         await conn.execute("""
             INSERT INTO optimization_log (tenant_id, insights, actions)
             VALUES ($1, $2, $3)
@@ -355,14 +346,14 @@ def _learning_stage(data_points: int) -> dict:
             "stage":   "developing",
             "label":   "Developing intelligence",
             "pct":     30 + round((data_points - 50) / 150 * 40),
-            "message": "Patterns emerging. Recommendations becoming Africa-specific.",
+            "message": "Patterns emerging. Recommendations becoming market-specific.",
         }
     elif data_points < 500:
         return {
             "stage":   "trained",
             "label":   "Market-trained",
             "pct":     70 + round((data_points - 200) / 300 * 25),
-            "message": "Strong market intelligence for your ICP. Recommendations are reliable.",
+            "message": "Strong market intelligence for your ICP. Recommendations are evidence-backed for the observed sample.",
         }
     else:
         return {
