@@ -1,6 +1,6 @@
 """FadeReach — Auth Router | Signup · Login · Welcome"""
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 import bcrypt, jwt, os, json
 from datetime import datetime, timedelta
 
@@ -22,7 +22,7 @@ APP_URL      = os.getenv("APP_URL", "https://fadereach.tinlance.com")
 class SignupReq(BaseModel):
     email: EmailStr
     name: str
-    password: str
+    password: str = Field(min_length=12, max_length=128)
     company: str | None = None
 
 class LoginReq(BaseModel):
@@ -30,9 +30,11 @@ class LoginReq(BaseModel):
     password: str
 
 def make_token(tenant_id: str, plan: str) -> str:
+    now = datetime.utcnow()
     return jwt.encode(
-        {"sub": tenant_id,
-         "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_H)},
+        {"sub": tenant_id, "iat": now,
+         "exp": now + timedelta(hours=JWT_EXPIRE_H),
+         "iss": "fadereach", "aud": "fadereach-api"},
         JWT_SECRET, algorithm="HS256"
     )
 
