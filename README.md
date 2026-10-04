@@ -105,7 +105,7 @@ fadereach/
 
 ## Engineering status
 
-The repository is being hardened in serial production phases. Green CI is a necessary gate, not proof of production readiness.
+The repository is being hardened in serial production phases. Green CI is a hard phase gate, not proof of production readiness. No subsequent phase is accepted until the current phase has a completed CI/workflow run on its actual code.
 
 Current sequence:
 
