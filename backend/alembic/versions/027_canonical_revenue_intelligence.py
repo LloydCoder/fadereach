@@ -436,25 +436,66 @@ def upgrade() -> None:
         ALTER TABLE revenue ENABLE ROW LEVEL SECURITY;
         ALTER TABLE outcomes ENABLE ROW LEVEL SECURITY;
 
-        DO $$
-        DECLARE
-            t TEXT;
-        BEGIN
-            FOREACH t IN ARRAY ARRAY[
-                'organizations','people','products','technologies','initiatives',
-                'commercial_events','observations','evidence','signals','signal_clusters',
-                'opportunities','opportunity_hypotheses','buying_committees',
-                'buying_committee_members','sequences','executions',
-                'meetings','deals','revenue','outcomes'
-            ]
-            LOOP
-                EXECUTE format(
-                    'CREATE POLICY %I ON %I USING (tenant_id::text = NULLIF(current_setting(''app.tenant_id'', true), '''')) WITH CHECK (tenant_id::text = NULLIF(current_setting(''app.tenant_id'', true), ''''))',
-                    t || '_tenant_isolation', t
-                );
-            END LOOP;
-        END
-        $$;
+        CREATE POLICY organizations_tenant_isolation ON organizations
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY people_tenant_isolation ON people
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY products_tenant_isolation ON products
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY technologies_tenant_isolation ON technologies
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY initiatives_tenant_isolation ON initiatives
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY commercial_events_tenant_isolation ON commercial_events
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY observations_tenant_isolation ON observations
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY evidence_tenant_isolation ON evidence
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY signals_tenant_isolation ON signals
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY signal_clusters_tenant_isolation ON signal_clusters
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY opportunities_tenant_isolation ON opportunities
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY opportunity_hypotheses_tenant_isolation ON opportunity_hypotheses
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY buying_committees_tenant_isolation ON buying_committees
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY buying_committee_members_tenant_isolation ON buying_committee_members
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY sequences_tenant_isolation ON sequences
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY executions_tenant_isolation ON executions
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY meetings_tenant_isolation ON meetings
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY deals_tenant_isolation ON deals
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY revenue_tenant_isolation ON revenue
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
+        CREATE POLICY outcomes_tenant_isolation ON outcomes
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
 
