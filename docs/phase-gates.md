@@ -28,7 +28,8 @@ A green workflow is necessary evidence, not proof of external production readine
 - F11 — Learning & revenue attribution — previously merged; revalidated by current CI baseline
 - F12 — Agency platform — previously merged; revalidated by current CI baseline
 - F13 — Enterprise platform — previously merged; revalidated by current CI baseline
-- **F14 — Reliability, observability & DR — implementation in review; CI gate pending**
+- F14 — Reliability, observability & DR — merged; main CI green
+- **F15 — Production operations — implementation in review; CI gate pending**
 - F3 — Security hardening
 - F4 — Durable outbound execution
 - F5 — Deliverability control plane

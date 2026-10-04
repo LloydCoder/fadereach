@@ -130,6 +130,7 @@ jobs:
           bash -n scripts/ec2_app_setup.sh
           bash -n ops/backup_postgres.sh
           bash -n ops/restore_postgres.sh
+          bash -n ops/smoke_test.sh
 
 
   security:
