@@ -222,7 +222,7 @@ At minimum the control plane should track:
 - provider/mailbox health
 - reputation signals where available
 
-For high-volume Gmail sending, Google currently requires both SPF and DKIM, DMARC, valid PTR, TLS, RFC 5322 formatting, low spam rates, aligned authentication and one-click unsubscribe for marketing/subscribed messages. citeturn1search1turn1search3
+For high-volume Gmail sending, Google currently requires both SPF and DKIM, DMARC, valid PTR, TLS, RFC 5322 formatting, low spam rates, aligned authentication and one-click unsubscribe for marketing/subscribed messages.
 
 ## Testing and CI
 
