@@ -19,6 +19,8 @@ from retention_worker import run_retention_worker
 
 DB_URL      = os.getenv("DATABASE_URL")
 WORKER_DB_URL = os.getenv("WORKER_DATABASE_URL") or DB_URL
+if ENVIRONMENT == "production" and not os.getenv("WORKER_DATABASE_URL"):
+    raise RuntimeError("WORKER_DATABASE_URL must be configured in production")
 if not DB_URL:
     raise RuntimeError("DATABASE_URL must be configured")
 REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
