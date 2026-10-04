@@ -96,14 +96,30 @@ async def ingest_signal(
         account_id = None
         if domain:
             account = await conn.fetchrow(
-                """INSERT INTO accounts (tenant_id, domain, name)
-                   VALUES ($1,$2,$3)
+                """INSERT INTO accounts
+                   (tenant_id, domain, canonical_domain, name, first_observed_at, last_observed_at)
+                   VALUES ($1,$2,$2,$3,NOW(),NOW())
                    ON CONFLICT (tenant_id, domain)
-                   DO UPDATE SET name=COALESCE(EXCLUDED.name, accounts.name), updated_at=NOW()
+                   DO UPDATE SET
+                       name=COALESCE(EXCLUDED.name, accounts.name),
+                       canonical_domain=EXCLUDED.canonical_domain,
+                       last_observed_at=NOW(),
+                       updated_at=NOW()
                    RETURNING id""",
                 tenant_id, domain.lower(), company_name,
             )
             account_id = account["id"]
+            await conn.execute(
+                """INSERT INTO account_aliases
+                   (tenant_id, account_id, source, external_id, observed_at, metadata)
+                   VALUES ($1,$2,$3,$4,NOW(),$5::jsonb)
+                   ON CONFLICT (tenant_id, source, external_id)
+                   DO UPDATE SET account_id=EXCLUDED.account_id,
+                                 observed_at=EXCLUDED.observed_at,
+                                 metadata=EXCLUDED.metadata""",
+                tenant_id, account_id, source, external_id,
+                json.dumps({"company_name": company_name, "domain": domain}),
+            )
 
         row = await conn.fetchrow(
             """INSERT INTO intelligence_signals
