@@ -46,11 +46,30 @@ async def get_current_tenant(
     return {**dict(tenant), "sub": str(tenant["id"])}
 
 async def require_admin(
+    request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
     admin_secret = os.getenv("ADMIN_SECRET", "")
-    if not admin_secret or not credentials.credentials:
-        raise HTTPException(403, "Admin access required")
-    if not __import__("hmac").compare_digest(credentials.credentials, admin_secret):
+    if not admin_secret:
+        raise HTTPException(503, "Administrative authentication is not configured")
+    if os.getenv("ENVIRONMENT") == "production" and len(admin_secret) < 32:
+        raise HTTPException(503, "Administrative authentication is misconfigured")
+
+    redis = request.app.state.redis
+    client_ip = request.client.host if request.client else "unknown"
+    try:
+        key = f"admin_rl:{client_ip}"
+        attempts = await redis.incr(key)
+        if attempts == 1:
+            await redis.expire(key, 300)
+        if attempts > 20:
+            raise HTTPException(429, "Too many administrative authentication attempts")
+    except HTTPException:
+        raise
+    except Exception:
+        pass
+
+    import hmac
+    if not hmac.compare_digest(credentials.credentials, admin_secret):
         raise HTTPException(403, "Admin access required")
     return {"role": "admin"}
