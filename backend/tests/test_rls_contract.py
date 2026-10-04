@@ -1,0 +1,86 @@
+import os
+
+import psycopg2
+import pytest
+from psycopg2.errors import InsufficientPrivilege
+
+
+TENANT_TABLES = {
+    "domains", "leads", "campaigns", "replies", "billing_events",
+    "workspace_members", "api_keys", "provisioning_jobs",
+    "provider_connections", "suppression_entries", "campaign_executions",
+    "messages", "message_events", "lead_intelligence",
+    "intelligence_signals", "demand_hypotheses", "accounts",
+    "account_signals", "autopilot_runs", "ai_feedback",
+    "optimization_log", "enterprise_settings",
+}
+
+
+def test_runtime_role_cannot_bypass_rls():
+    with psycopg2.connect(os.environ["MIGRATION_DATABASE_URL"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT rolsuper, rolcreaterole, rolcreatedb, rolbypassrls, rolinherit
+                FROM pg_roles WHERE rolname = 'fadereach_runtime'
+            """)
+            assert cur.fetchone() == (False, False, False, False, False)
+
+
+def test_every_tenant_table_has_rls_and_policy():
+    with psycopg2.connect(os.environ["MIGRATION_DATABASE_URL"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT c.table_name, cls.relrowsecurity,
+                       EXISTS (
+                           SELECT 1 FROM pg_policies p
+                           WHERE p.schemaname = 'public'
+                             AND p.tablename = c.table_name
+                             AND p.policyname = c.table_name || '_tenant_isolation'
+                       )
+                FROM information_schema.columns c
+                JOIN pg_class cls ON cls.relname = c.table_name
+                JOIN pg_namespace n ON n.oid = cls.relnamespace
+                                  AND n.nspname = 'public'
+                WHERE c.table_schema = 'public' AND c.column_name = 'tenant_id'
+                GROUP BY c.table_name, cls.relrowsecurity
+            """)
+            found = {name: (rls, policy) for name, rls, policy in cur.fetchall()}
+
+    assert not TENANT_TABLES - found.keys()
+    assert not [name for name in TENANT_TABLES if not all(found[name])]
+
+
+def test_runtime_role_cannot_cross_tenants():
+    admin_url = os.environ["MIGRATION_DATABASE_URL"]
+    runtime_url = os.environ["DATABASE_URL"]
+
+    with psycopg2.connect(admin_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                INSERT INTO tenants (id,email,name,password_hash)
+                VALUES ('f2-a','f2-a@example.test','F2 A','test'),
+                       ('f2-b','f2-b@example.test','F2 B','test')
+                ON CONFLICT (id) DO NOTHING
+            """)
+            cur.execute("""
+                INSERT INTO accounts (tenant_id,domain,name)
+                VALUES ('f2-a','f2-a.example.test','F2 A account'),
+                       ('f2-b','f2-b.example.test','F2 B account')
+                ON CONFLICT (tenant_id,domain) DO NOTHING
+            """)
+        conn.commit()
+
+    with psycopg2.connect(runtime_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT set_config('app.tenant_id','f2-a',false)")
+            cur.execute("SELECT domain FROM accounts ORDER BY domain")
+            assert [row[0] for row in cur.fetchall()] == ["f2-a.example.test"]
+
+    with psycopg2.connect(runtime_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT set_config('app.tenant_id','f2-a',false)")
+            with pytest.raises(InsufficientPrivilege):
+                cur.execute("""
+                    INSERT INTO accounts (tenant_id,domain,name)
+                    VALUES ('f2-b','blocked.example.test','must fail')
+                """)
