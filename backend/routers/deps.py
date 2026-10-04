@@ -16,7 +16,7 @@ async def get_current_tenant(
     credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
     try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=["HS256"])
+        payload = jwt.decode(credentials.credentials, JWT_SECRET, algorithms=["HS256"], audience="fadereach-api", issuer="fadereach")
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Session expired — please log in again")
     except jwt.InvalidTokenError:
