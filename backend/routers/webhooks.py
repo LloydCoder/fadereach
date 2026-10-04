@@ -45,13 +45,14 @@ async def lemonsqueezy_webhook(
 ):
     body = await request.body()
 
-    # Verify signature
-    if LS_WEBHOOK_SECRET:
-        expected = hmac.new(
+    # Verify signature — fail closed when the secret is not configured.
+    if not LS_WEBHOOK_SECRET:
+        raise HTTPException(503, "LemonSqueezy webhook verification is not configured")
+    expected = hmac.new(
             LS_WEBHOOK_SECRET.encode(),
             body, hashlib.sha256
-        ).hexdigest()
-        if not hmac.compare_digest(f"sha256={expected}", x_signature or ""):
+    ).hexdigest()
+    if not hmac.compare_digest(f"sha256={expected}", x_signature or ""):
             raise HTTPException(401, "Invalid LemonSqueezy signature")
 
     data       = json.loads(body)
@@ -98,13 +99,14 @@ async def paystack_webhook(
 ):
     body = await request.body()
 
-    # Verify HMAC-SHA512 — same pattern as Tinlance admin
-    if PAYSTACK_SECRET_KEY:
-        expected = hmac.new(
+    # Verify HMAC-SHA512 — fail closed when the secret is not configured.
+    if not PAYSTACK_SECRET_KEY:
+        raise HTTPException(503, "Paystack webhook verification is not configured")
+    expected = hmac.new(
             PAYSTACK_SECRET_KEY.encode(),
             body, hashlib.sha512
-        ).hexdigest()
-        if not hmac.compare_digest(expected, x_paystack_signature or ""):
+    ).hexdigest()
+    if not hmac.compare_digest(expected, x_paystack_signature or ""):
             raise HTTPException(401, "Invalid Paystack signature")
 
     data  = json.loads(body)
@@ -147,9 +149,10 @@ async def paddle_webhook(
     """
     body = await request.body()
 
-    # Verify Paddle signature
-    if PADDLE_WEBHOOK_SECRET:
-        if not _verify_paddle_signature(body, paddle_signature or "", PADDLE_WEBHOOK_SECRET):
+    # Verify Paddle signature — fail closed when the secret is not configured.
+    if not PADDLE_WEBHOOK_SECRET:
+        raise HTTPException(503, "Paddle webhook verification is not configured")
+    if not _verify_paddle_signature(body, paddle_signature or "", PADDLE_WEBHOOK_SECRET):
             raise HTTPException(401, "Invalid Paddle signature")
 
     data       = json.loads(body)
