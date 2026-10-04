@@ -60,6 +60,16 @@ async def get_account_graph(
                ORDER BY updated_at DESC LIMIT 100""",
             tenant_id, account["id"],
         )
+        committee = await conn.fetchrow(
+            """SELECT bc.id, bc.status, bc.confidence, bc.updated_at
+               FROM buying_committees bc
+               JOIN opportunities o ON o.id=bc.opportunity_id
+               WHERE bc.tenant_id=$1 AND o.organization_id=(
+                   SELECT organization_id FROM accounts WHERE tenant_id=$1 AND id=$2
+               )
+               ORDER BY bc.updated_at DESC LIMIT 1""",
+            tenant_id, account["id"],
+        )
         why_now = await conn.fetchrow(
             """SELECT id, what_changed, when_changed, why_matters, why_now,
                       capability_required, confidence, unknowns, evidence_refs,
@@ -97,6 +107,7 @@ async def get_account_graph(
         "opportunities": [dict(row) for row in opportunities],
         "edges": [dict(row) for row in edges],
         "why_now": dict(why_now) if why_now else None,
+        "buying_committee": dict(committee) if committee else None,
         "graph_semantics": {
             "account": "company/entity",
             "people": "buyer/contact",
