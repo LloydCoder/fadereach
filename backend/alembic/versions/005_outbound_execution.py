@@ -13,6 +13,8 @@ depends_on = None
 
 def upgrade():
     op.execute("""
+        ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS body_html TEXT NOT NULL DEFAULT '';
+
         CREATE TABLE IF NOT EXISTS provider_connections (
             id BIGSERIAL PRIMARY KEY,
             tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
