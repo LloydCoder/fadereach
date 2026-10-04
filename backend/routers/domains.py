@@ -118,7 +118,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "bounce_rate_critical",
             "message": f"Bounce rate {bounce_rate:.1f}% — above 2% limit",
             "fix": "Pause campaigns immediately. Clean your list with Reacher before resuming.",
-            "impact": "Sending reputation severely damaged — domain may be blacklisted"
+            "impact": "Elevated bounce rates can damage sender reputation and trigger provider enforcement."
         })
     elif bounce_rate > 1.5:
         score -= 10
