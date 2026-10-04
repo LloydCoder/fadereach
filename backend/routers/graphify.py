@@ -291,7 +291,7 @@ async def get_knowledge_graph(
 def _cache_key(lead: dict, product: str) -> str:
     """Deterministic cache key per lead+product"""
     key_str = f"{lead.get('email','')}-{lead.get('company','')}-{product}"
-    return hashlib.md5(key_str.encode()).hexdigest()
+    return hashlib.sha256(key_str.encode()).hexdigest()
 
 def _classify_lead(lead: dict) -> Optional[str]:
     """Classify lead into ICP type using keyword matching"""

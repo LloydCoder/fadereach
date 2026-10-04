@@ -13,6 +13,7 @@ PAYSTACK_SECRET_KEY   = os.getenv("PAYSTACK_SECRET_KEY", "")
 PADDLE_WEBHOOK_SECRET = os.getenv("PADDLE_WEBHOOK_SECRET", "")
 RESEND_KEY            = os.getenv("RESEND_API_KEY", "")
 APP_URL               = os.getenv("APP_URL", "https://fadereach.tinlance.com")
+MAX_WEBHOOK_BODY_BYTES = int(os.getenv("MAX_WEBHOOK_BODY_BYTES", str(1024 * 1024)))
 
 def _parse_webhook_json(body: bytes) -> dict:
     if len(body) > MAX_WEBHOOK_BODY_BYTES:
@@ -47,6 +48,13 @@ async def _claim_webhook_event(db, provider: str, event_id: str, payload: dict) 
     return row is not None
 
 
+
+def _mapped_plan(mapping: dict[str, str], provider_id: str, provider: str) -> str:
+    """Resolve a configured billing identifier; never guess a paid plan."""
+    normalized = str(provider_id or "").strip()
+    if not normalized or normalized not in mapping or not mapping[normalized]:
+        raise HTTPException(400, f"Unknown or unconfigured {provider} plan identifier")
+    return mapping[normalized]
 
 # ── Plan mapping per provider ───────────────────
 LS_VARIANT_PLANS = {
@@ -98,7 +106,7 @@ async def lemonsqueezy_webhook(
     attrs      = data.get("data", {}).get("attributes", {})
     email      = attrs.get("user_email", "")
     variant_id = str(attrs.get("variant_id", ""))
-    plan       = LS_VARIANT_PLANS.get(variant_id, "growth")
+    plan       = _mapped_plan(LS_VARIANT_PLANS, variant_id, "LemonSqueezy")
 
 
     if event_type == "subscription_created":
@@ -107,7 +115,7 @@ async def lemonsqueezy_webhook(
 
     elif event_type == "subscription_updated":
         new_variant = str(attrs.get("variant_id", ""))
-        new_plan    = LS_VARIANT_PLANS.get(new_variant, plan)
+        new_plan    = _mapped_plan(LS_VARIANT_PLANS, new_variant, "LemonSqueezy")
         await _upgrade_plan(db, email, new_plan)
 
     elif event_type == "subscription_cancelled":
@@ -158,7 +166,7 @@ async def paystack_webhook(
 
     if event == "subscription.create":
         plan_code = obj.get("plan", {}).get("plan_code", "")
-        plan      = PAYSTACK_PLAN_CODES.get(plan_code, "growth")
+        plan      = _mapped_plan(PAYSTACK_PLAN_CODES, plan_code, "Paystack")
         amount    = obj.get("amount", 0) / 100  # Paystack sends kobo
         await _activate_plan(db, email, plan, "paystack", amount)
 
@@ -211,7 +219,7 @@ async def paddle_webhook(
     email    = obj.get("customer", {}).get("email", "") or \
                obj.get("custom_data", {}).get("email", "")
     price_id = obj.get("items", [{}])[0].get("price", {}).get("id", "") if obj.get("items") else ""
-    plan     = PADDLE_PRICE_PLANS.get(price_id, "agency")
+    plan     = _mapped_plan(PADDLE_PRICE_PLANS, price_id, "Paddle")
 
     if not await _claim_webhook_event(db, "paddle", event_id, data):
         return {"received": True, "duplicate": True}
@@ -222,7 +230,7 @@ async def paddle_webhook(
 
     elif event_type == "subscription.updated":
         new_price_id = obj.get("items", [{}])[0].get("price", {}).get("id", "")
-        new_plan     = PADDLE_PRICE_PLANS.get(new_price_id, plan)
+        new_plan     = _mapped_plan(PADDLE_PRICE_PLANS, new_price_id, "Paddle")
         await _upgrade_plan(db, email, new_plan)
 
     elif event_type == "subscription.cancelled":

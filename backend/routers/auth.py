@@ -50,8 +50,10 @@ async def _rate_limit(request: Request, bucket: str, limit: int, window: int) ->
             raise HTTPException(429, "Too many authentication attempts; try again later")
     except HTTPException:
         raise
-    except Exception:
-        return
+    except Exception as exc:
+        # Authentication throttling is a security control. Do not silently
+        # bypass it when the backing state store is unavailable.
+        raise HTTPException(503, "Authentication rate limiting is temporarily unavailable") from exc
 
 
 async def send_welcome_email(email: str, name: str):

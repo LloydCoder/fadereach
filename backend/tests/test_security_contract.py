@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 
 from middleware.security import SecurityHeadersMiddleware, allowed_hosts
 from routers.auth import LoginReq, SignupReq
-from routers.webhooks import _parse_webhook_json, _require_event_id
+from routers.webhooks import _mapped_plan, _parse_webhook_json, _require_event_id, MAX_WEBHOOK_BODY_BYTES
 
 
 def test_security_middleware_rejects_oversized_request(monkeypatch):
@@ -57,3 +57,16 @@ def test_allowed_hosts_has_production_defaults():
     hosts = allowed_hosts()
     assert "fadereach.app" in hosts
     assert "fadereach.tinlance.com" in hosts
+
+
+def test_webhook_body_limit_is_bounded():
+    with pytest.raises(Exception):
+        _parse_webhook_json(b"{" + b'"x":"' + b"a" * MAX_WEBHOOK_BODY_BYTES + b'"}')
+
+
+def test_billing_plan_mapping_fails_closed():
+    assert _mapped_plan({"variant-1": "growth"}, "variant-1", "test") == "growth"
+    with pytest.raises(Exception):
+        _mapped_plan({"variant-1": "growth"}, "unknown", "test")
+    with pytest.raises(Exception):
+        _mapped_plan({"": "growth"}, "", "test")
