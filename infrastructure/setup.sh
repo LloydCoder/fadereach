@@ -26,6 +26,7 @@ SENDING_DOMAIN_2="fr-send2.com"       # Secondary rotation domain
 VPS_IP="YOUR_VPS_IP"                   # Replace with Contabo IP
 ADMIN_EMAIL="nwachukwuchinaemerem8@gmail.com"
 POSTGRES_PASSWORD=$(openssl rand -base64 24)
+POSTGRES_RUNTIME_PASSWORD=$(openssl rand -base64 24)
 JWT_SECRET=$(openssl rand -base64 48)
 ADMIN_PASSWORD=$(openssl rand -base64 16)
 # ──────────────────────────────────────────────────────────
@@ -69,6 +70,10 @@ sudo -u postgres psql <<EOF
 CREATE DATABASE fadereach_meta;
 CREATE USER fadereach WITH ENCRYPTED PASSWORD '$POSTGRES_PASSWORD';
 GRANT ALL PRIVILEGES ON DATABASE fadereach_meta TO fadereach;
+
+-- Least-privilege runtime role used by the application
+CREATE USER fadereach_runtime WITH ENCRYPTED PASSWORD '$POSTGRES_RUNTIME_PASSWORD';
+GRANT CONNECT ON DATABASE fadereach_meta TO fadereach_runtime;
 
 -- Listmonk internal instance (Lloyd's campaigns)
 CREATE DATABASE listmonk_internal;
@@ -410,6 +415,7 @@ Generated: $(date)
 DOMAIN=$DOMAIN
 VPS_IP=$VPS_IP
 POSTGRES_PASSWORD=$POSTGRES_PASSWORD
+POSTGRES_RUNTIME_PASSWORD=$POSTGRES_RUNTIME_PASSWORD
 JWT_SECRET=$JWT_SECRET
 ADMIN_PASSWORD=$ADMIN_PASSWORD
 LISTMONK_INTERNAL_URL=http://localhost:9100
