@@ -39,74 +39,8 @@ app.add_middleware(CORSMiddleware,
 )
 
 async def _init_db(pool):
-    async with pool.acquire() as conn:
-        await conn.execute("""
-        CREATE TABLE IF NOT EXISTS tenants (
-            id TEXT PRIMARY KEY, email TEXT UNIQUE NOT NULL, name TEXT NOT NULL,
-            company TEXT, password_hash TEXT NOT NULL,
-            plan TEXT NOT NULL DEFAULT 'trial', status TEXT NOT NULL DEFAULT 'trial',
-            trial_ends_at TIMESTAMPTZ DEFAULT NOW() + INTERVAL '14 days',
-            listmonk_url TEXT, listmonk_port INTEGER,
-            emails_sent_mo INTEGER DEFAULT 0, contacts_count INTEGER DEFAULT 0,
-            onboarded BOOLEAN DEFAULT FALSE,
-            created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS domains (
-            id SERIAL PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id) ON DELETE CASCADE,
-            domain TEXT NOT NULL, spf_valid BOOLEAN DEFAULT FALSE,
-            dkim_valid BOOLEAN DEFAULT FALSE, dmarc_valid BOOLEAN DEFAULT FALSE,
-            warmup_day INTEGER DEFAULT 0, warmup_status TEXT DEFAULT 'not_started',
-            daily_limit INTEGER DEFAULT 5, sent_today INTEGER DEFAULT 0,
-            bounce_rate NUMERIC DEFAULT 0, complaint_rate NUMERIC DEFAULT 0,
-            health_score INTEGER DEFAULT 0, inbox_prob INTEGER DEFAULT 0,
-            blacklisted BOOLEAN DEFAULT FALSE,
-            added_at TIMESTAMPTZ DEFAULT NOW(), last_checked TIMESTAMPTZ
-        );
-        CREATE TABLE IF NOT EXISTS leads (
-            id SERIAL PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id) ON DELETE CASCADE,
-            email TEXT NOT NULL, first_name TEXT, last_name TEXT,
-            company TEXT, title TEXT, domain TEXT, linkedin_url TEXT,
-            industry TEXT, company_size TEXT, location TEXT,
-            status TEXT DEFAULT 'uncontacted', verify_status TEXT DEFAULT 'unverified',
-            verify_score INTEGER DEFAULT 0, icp_score INTEGER DEFAULT 0,
-            ai_first_line TEXT, ai_hook TEXT, ai_score INTEGER DEFAULT 0,
-            signal_type TEXT, signal_data JSONB, created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS campaigns (
-            id SERIAL PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id) ON DELETE CASCADE,
-            name TEXT NOT NULL, subject TEXT NOT NULL, status TEXT DEFAULT 'draft',
-            product TEXT, target_segment TEXT, sequence_steps INTEGER DEFAULT 4,
-            emails_sent INTEGER DEFAULT 0, opens INTEGER DEFAULT 0,
-            clicks INTEGER DEFAULT 0, replies INTEGER DEFAULT 0,
-            bounces INTEGER DEFAULT 0, unsubscribes INTEGER DEFAULT 0,
-            audit_score INTEGER, audit_issues JSONB,
-            created_at TIMESTAMPTZ DEFAULT NOW(), updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS replies (
-            id SERIAL PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id) ON DELETE CASCADE,
-            campaign_id INTEGER REFERENCES campaigns(id), lead_id INTEGER REFERENCES leads(id),
-            from_email TEXT NOT NULL, subject TEXT, body TEXT,
-            intent TEXT DEFAULT 'unknown', sentiment TEXT DEFAULT 'neutral',
-            is_hot BOOLEAN DEFAULT FALSE, is_read BOOLEAN DEFAULT FALSE,
-            received_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS billing_events (
-            id SERIAL PRIMARY KEY, tenant_id TEXT REFERENCES tenants(id),
-            event_type TEXT NOT NULL, provider TEXT NOT NULL,
-            amount NUMERIC, currency TEXT, metadata JSONB,
-            created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE TABLE IF NOT EXISTS audit_log (
-            id SERIAL PRIMARY KEY, actor TEXT NOT NULL, tenant_id TEXT,
-            action TEXT NOT NULL, resource TEXT, metadata JSONB,
-            ip_address TEXT, created_at TIMESTAMPTZ DEFAULT NOW()
-        );
-        CREATE INDEX IF NOT EXISTS idx_leads_tenant     ON leads(tenant_id);
-        CREATE INDEX IF NOT EXISTS idx_campaigns_tenant ON campaigns(tenant_id);
-        CREATE INDEX IF NOT EXISTS idx_replies_tenant   ON replies(tenant_id);
-        CREATE INDEX IF NOT EXISTS idx_domains_tenant   ON domains(tenant_id);
-        CREATE INDEX IF NOT EXISTS idx_replies_hot      ON replies(tenant_id, is_hot, is_read);
-        """)
+    """Deprecated compatibility hook; schema is managed by Alembic."""
+    return None
 
 @app.get("/api/health")
 async def health(request: Request):
