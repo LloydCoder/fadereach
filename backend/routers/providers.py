@@ -1,5 +1,7 @@
 """Outbound provider connection management and Listmonk execution adapter."""
 from urllib.parse import urlparse
+import ipaddress
+import socket
 import os
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
@@ -31,6 +33,17 @@ def _validate_base_url(value: str) -> str:
     hostname = (parsed.hostname or "").lower()
     if hostname in {"localhost", "127.0.0.1", "::1"}:
         raise HTTPException(400, "Loopback provider URLs are not allowed")
+    try:
+        addresses = {
+            info[4][0]
+            for info in socket.getaddrinfo(hostname, parsed.port or (443 if parsed.scheme == "https" else 80), type=socket.SOCK_STREAM)
+        }
+    except OSError as exc:
+        raise HTTPException(400, "Provider hostname could not be resolved") from exc
+    for address in addresses:
+        ip = ipaddress.ip_address(address)
+        if any((ip.is_private, ip.is_loopback, ip.is_link_local, ip.is_multicast, ip.is_reserved, ip.is_unspecified)):
+            raise HTTPException(400, "Provider URL resolves to a non-public address")
     return value.rstrip("/")
 
 
@@ -50,7 +63,7 @@ async def connect_listmonk(
     base_url = _validate_base_url(req.base_url)
     # Verify credentials before persisting them.
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, follow_redirects=False) as client:
             response = await client.get(
                 f"{base_url}/api/lists",
                 auth=(req.api_username, req.api_token),
