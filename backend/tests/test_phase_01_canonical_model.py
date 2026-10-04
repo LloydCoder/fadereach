@@ -10,7 +10,7 @@ def test_phase_01_canonical_entities_are_present():
 
 def test_phase_01_has_tenant_isolation_and_lineage_constraints():
     assert "ENABLE ROW LEVEL SECURITY" in SOURCE
-    assert "current_setting(''app.tenant_id'', true)" in SOURCE
+    assert "current_setting('app.tenant_id', true)" in SOURCE
     assert "signal_evidence" in SOURCE and "hypothesis_evidence" in SOURCE
     assert "idempotency_key" in SOURCE and "provider_message_id" in SOURCE
 
