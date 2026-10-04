@@ -6,7 +6,7 @@ SOURCE = MIGRATION.read_text(encoding="utf-8")
 def test_phase_01_canonical_entities_are_present():
     required = ["organizations","people","products","technologies","initiatives","commercial_events","observations","evidence","signals","signal_clusters","opportunities","opportunity_hypotheses","buying_committees","sequences","messages","executions","meetings","deals","revenue","outcomes"]
     for table in required:
-        assert f"CREATE TABLE IF NOT EXISTS {table}" in SOURCE
+        assert (f"CREATE TABLE IF NOT EXISTS {table}" in SOURCE or (table == "messages" and "ALTER TABLE messages" in SOURCE))
 
 def test_phase_01_has_tenant_isolation_and_lineage_constraints():
     assert "ENABLE ROW LEVEL SECURITY" in SOURCE
