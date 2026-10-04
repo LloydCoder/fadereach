@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from .deps import get_current_tenant
 import httpx, os
 from datetime import datetime
+import socket
 
 router = APIRouter()
 
@@ -27,39 +28,49 @@ WARMUP_SCHEDULE = [
 
 class DomainAddReq(BaseModel):
     domain: str
+    dkim_selector: str = "mail"
+    sending_ip: str | None = None
 
-async def check_dns(domain: str) -> dict:
-    """Check SPF, DKIM, DMARC via DNS lookup"""
-    result = {"spf": False, "dkim": False, "dmarc": False, "mx": False}
+async def check_dns(domain: str, dkim_selector: str = "mail", sending_ip: str | None = None) -> dict:
+    """Check observable sender controls without predicting inbox placement."""
+    result = {"spf": False, "dkim": False, "dmarc": False, "mx": False, "ptr": None, "dmarc_policy": None}
     try:
         import dns.resolver
-        # SPF
         try:
             answers = dns.resolver.resolve(domain, "TXT")
-            for r in answers:
-                if "v=spf1" in str(r):
-                    result["spf"] = True
-        except: pass
-        # DKIM
+            result["spf"] = any("v=spf1" in str(r).lower() for r in answers)
+        except Exception:
+            pass
         try:
-            dns.resolver.resolve(f"mail._domainkey.{domain}", "TXT")
-            result["dkim"] = True
-        except: pass
-        # DMARC
+            answers = dns.resolver.resolve(f"{dkim_selector}._domainkey.{domain}", "TXT")
+            result["dkim"] = any("v=DKIM1" in str(r).upper() or "P=" in str(r).upper() for r in answers)
+        except Exception:
+            pass
         try:
             answers = dns.resolver.resolve(f"_dmarc.{domain}", "TXT")
             for r in answers:
-                if "v=DMARC1" in str(r):
+                value = str(r).replace('"', '')
+                if "v=DMARC1" in value.upper():
                     result["dmarc"] = True
-        except: pass
-        # MX
+                    for part in value.split(";"):
+                        if part.strip().lower().startswith("p="):
+                            result["dmarc_policy"] = part.split("=", 1)[1].strip().lower()
+        except Exception:
+            pass
         try:
             dns.resolver.resolve(domain, "MX")
             result["mx"] = True
-        except: pass
-    except Exception as e:
-        print(f"DNS check error [{domain}]: {e}")
+        except Exception:
+            pass
+        if sending_ip:
+            try:
+                result["ptr"] = bool(socket.gethostbyaddr(sending_ip)[0])
+            except Exception:
+                result["ptr"] = False
+    except Exception as exc:
+        print(f"DNS check error [{domain}]: {exc}")
     return result
+
 
 def calculate_health_score(dns: dict, bounce_rate: float,
                             complaint_rate: float, warmup_day: int) -> tuple[int, int, list]:
@@ -77,7 +88,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "severity": "critical",
             "type": "spf_missing",
             "message": "SPF record missing",
-            "fix": f"Add TXT record: v=spf1 ip4:YOUR_VPS_IP ~all",
+            "fix": f"Add TXT record: v=spf1 ip4:YOUR_SENDING_IP ~all",
             "impact": "Emails may be rejected by recipient servers"
         })
     if not dns.get("dkim"):
@@ -234,7 +245,7 @@ async def add_domain(
             VALUES ($1, $2, 'checking') RETURNING id
         """, tenant_id, req.domain.lower().strip())
 
-    background_tasks.add_task(_verify_and_score_domain, db, domain_id, req.domain.lower().strip())
+    background_tasks.add_task(_verify_and_score_domain, db, domain_id, req.domain.lower().strip(), req.dkim_selector, req.sending_ip)
 
     return {
         "domain_id":  domain_id,
@@ -244,6 +255,39 @@ async def add_domain(
         "dns_records_needed": _get_dns_guide(req.domain)
     }
 
+@router.post("/{domain_id}/pause")
+async def pause_domain(domain_id: int, request: Request, auth: dict = Depends(get_current_tenant)):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            "UPDATE domains SET sending_paused=TRUE, pause_reason='Manually paused', last_deliverability_check=NOW() WHERE id=$1 AND tenant_id=$2 RETURNING id",
+            domain_id, auth["sub"],
+        )
+    if not row:
+        raise HTTPException(404, "Domain not found")
+    return {"domain_id": domain_id, "sending_paused": True}
+
+
+@router.post("/{domain_id}/resume")
+async def resume_domain(domain_id: int, request: Request, auth: dict = Depends(get_current_tenant)):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT id, spf_valid, dkim_valid, dmarc_valid, mx_valid
+               FROM domains WHERE id=$1 AND tenant_id=$2""",
+            domain_id, auth["sub"],
+        )
+        if not row:
+            raise HTTPException(404, "Domain not found")
+        if not all([row["spf_valid"], row["dkim_valid"], row["dmarc_valid"], row["mx_valid"]]):
+            raise HTTPException(409, "Sender authentication and MX checks must pass before resuming")
+        await conn.execute(
+            "UPDATE domains SET sending_paused=FALSE, pause_reason=NULL, last_deliverability_check=NOW() WHERE id=$1 AND tenant_id=$2",
+            domain_id, auth["sub"],
+        )
+    return {"domain_id": domain_id, "sending_paused": False}
+
+
 @router.get("")
 async def list_domains(request: Request, auth: dict = Depends(get_current_tenant)):
     db = request.app.state.db
@@ -252,7 +296,7 @@ async def list_domains(request: Request, auth: dict = Depends(get_current_tenant
             SELECT id, domain, spf_valid, dkim_valid, dmarc_valid, mx_valid,
                    warmup_day, warmup_status, daily_limit, sent_today,
                    bounce_rate, complaint_rate, health_score, deliverability_readiness,
-                   blacklisted, last_checked
+                   sending_paused, pause_reason, last_checked, last_deliverability_check
             FROM domains WHERE tenant_id=$1 ORDER BY added_at DESC
         """, auth["sub"])
     return {"domains": [dict(r) for r in rows]}
@@ -337,23 +381,27 @@ async def deliverability_copilot(
     }
 
 # ── Internal helpers ────────────────────────────
-async def _verify_and_score_domain(db, domain_id: int, domain: str):
+async def _verify_and_score_domain(db, domain_id: int, domain: str, dkim_selector: str = "mail", sending_ip: str | None = None):
     """Background: check DNS + score + update DB"""
     try:
-        dns = await check_dns(domain)
+        dns = await check_dns(domain, dkim_selector, sending_ip)
         score, readiness, _ = calculate_health_score(dns, 0.0, 0.0, 0)
         async with db.acquire() as conn:
             await conn.execute("""
                 UPDATE domains
-                SET spf_valid=$1, dkim_valid=$2, dmarc_valid=$3,
-                    health_score=$4, deliverability_readiness=$5,
+                SET spf_valid=$1, dkim_valid=$2, dmarc_valid=$3, mx_valid=$4,
+                    dmarc_policy=$5, ptr_valid=$6,
+                    health_score=$7, deliverability_readiness=$8,
+                    sending_paused=NOT ($1 AND $2 AND $3 AND $4),
+                    pause_reason=CASE WHEN NOT ($1 AND $2 AND $3 AND $4)
+                        THEN 'Sender authentication/DNS controls incomplete' ELSE NULL END,
                     warmup_status=CASE WHEN warmup_status='checking'
-                        THEN CASE WHEN $1 AND $2 THEN 'ready' ELSE 'dns_incomplete' END
+                        THEN CASE WHEN $1 AND $2 AND $3 AND $4 THEN 'ready' ELSE 'dns_incomplete' END
                         ELSE warmup_status END,
-                    last_checked=NOW()
-                WHERE id=$6
-            """, dns["spf"], dns["dkim"], dns["dmarc"],
-                score, readiness, domain_id)
+                    last_checked=NOW(), last_deliverability_check=NOW()
+                WHERE id=$9
+            """, dns["spf"], dns["dkim"], dns["dmarc"], dns["mx"],
+                dns["dmarc_policy"], dns["ptr"], score, readiness, domain_id)
     except Exception as e:
         print(f"Domain verify error [{domain}]: {e}")
 
@@ -362,7 +410,7 @@ def _get_dns_guide(domain: str) -> dict:
         "spf": {
             "type": "TXT", "name": "@",
             "value": "v=spf1 ip4:YOUR_VPS_IP ~all",
-            "note": "Replace YOUR_VPS_IP with your EC2 IP (13.50.16.19)"
+            "note": "Use the public sending IP assigned to your mail infrastructure."
         },
         "dkim": {
             "type": "TXT", "name": "mail._domainkey",
