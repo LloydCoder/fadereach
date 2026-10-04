@@ -294,24 +294,27 @@ async def send_campaign(
         if not leads:
             raise HTTPException(409, "No eligible recipients remain after suppression and status checks")
 
+        execution = None
+
+    async with db.acquire() as conn:
         execution = await conn.fetchrow(
             """INSERT INTO campaign_executions
                (tenant_id, campaign_id, provider_connection_id, status, recipient_count)
                VALUES ($1,$2,$3,'queued',$4)
-               ON CONFLICT (campaign_id)
-               DO UPDATE SET status='queued', recipient_count=EXCLUDED.recipient_count,
-                             error_message=NULL, started_at=NULL, completed_at=NULL
                RETURNING id""",
             tenant_id, campaign_id, provider["id"], len(leads),
         )
+        await conn.execute(
+            """INSERT INTO execution_jobs (tenant_id, execution_id, status)
+               VALUES ($1,$2,'queued')""",
+            tenant_id, execution["id"],
+        )
 
-    background_tasks.add_task(
-        _execute_listmonk_campaign,
-        db, execution["id"], tenant_id, campaign_id,
-        [dict(row) for row in leads],
-        dict(provider), campaign["name"], campaign["subject"], campaign["body_html"],
+    await record_audit(
+        db, tenant_id, tenant_id, "campaign.send.queued",
+        f"campaign:{campaign_id}",
+        {"execution_id": execution["id"], "recipient_count": len(leads)},
     )
-    await record_audit(db, tenant_id, tenant_id, "campaign.send.queued", f"campaign:{campaign_id}", {"execution_id": execution["id"], "recipient_count": len(leads)})
     return {
         "campaign_id": campaign_id,
         "execution_id": execution["id"],
