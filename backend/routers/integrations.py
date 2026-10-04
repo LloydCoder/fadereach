@@ -80,14 +80,16 @@ async def ingest_signal(
         tenant = await conn.fetchval("SELECT id FROM tenants WHERE id=$1", tenant_id)
         if not tenant:
             raise HTTPException(404, "Tenant not found")
-        duplicate = await conn.fetchval(
+        claimed = await conn.fetchval(
             """
-            SELECT 1 FROM webhook_events
-            WHERE provider='tads_sdea' AND event_id=$1
+            INSERT INTO webhook_events (provider,event_id,payload)
+            VALUES ('tads_sdea',$1,$2::jsonb)
+            ON CONFLICT (provider,event_id) DO NOTHING
+            RETURNING id
             """,
-            external_id,
+            external_id, json.dumps(payload),
         )
-        if duplicate:
+        if not claimed:
             return {"status": "duplicate", "external_id": external_id}
 
         account_id = None
@@ -102,14 +104,6 @@ async def ingest_signal(
             )
             account_id = account["id"]
 
-        await conn.execute(
-            """
-            INSERT INTO webhook_events (provider,event_id,payload)
-            VALUES ('tads_sdea',$1,$2::jsonb)
-            ON CONFLICT (provider,event_id) DO NOTHING
-            """,
-            external_id, json.dumps(payload),
-        )
         row = await conn.fetchrow(
             """INSERT INTO intelligence_signals
                (tenant_id, source, signal_type, company_name, domain, observed_at, score, evidence, external_id)
