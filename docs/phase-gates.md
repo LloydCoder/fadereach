@@ -18,7 +18,8 @@ A green workflow is necessary evidence, not proof of external production readine
 - F1 — Deterministic production foundation
 - F2 — Database and tenancy — merged; main CI green
 - **F3 — Security hardening — merged; main CI green**
-- **F4 — Durable outbound execution — implementation in review; CI gate pending**
+- F4 — Durable outbound execution — merged; main CI green
+- **F5 — Deliverability control plane — implementation in review; CI gate pending**
 - F3 — Security hardening
 - F4 — Durable outbound execution
 - F5 — Deliverability control plane
