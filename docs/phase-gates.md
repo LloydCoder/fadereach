@@ -54,13 +54,13 @@ A phase may be promoted only when all of the following are true:
 | F14 | Implemented | Merged and historically CI-green |
 | F15 | Implemented | Merged and historically CI-green |
 | F16 | Implemented as bounded/fail-closed autonomy contract | Repository contract complete; Tinlance Agent Platform M29 conformance is the authoritative external execution boundary. Live endpoint/credential validation remains an operational production gate, not a missing FadeReach repository implementation. |
-| F17 | Final forensic audit documentation and reconciliation | **Runs only after F16 gate is satisfied** |
+| F17 | Final forensic audit documentation and reconciliation | **Repository audit complete; promoted commit CI-green** |
 
 ## Current promotion evidence
 
 F16 PR #45 was merged into `main` on 2026-10-04. The PR head commit passed the FadeReach CI workflow before merge.
 
-The F16 merge commit is the authoritative promotion candidate. Its required workflow run must be verified before F16 is marked green. The F17 documentation reconciliation is now merged; repository-level F17 acceptance remains conditional on this promoted-commit workflow and the explicit external Agent Platform delegation validation.
+The final promoted FadeReach commit is the authoritative repository gate. The promoted F17 ledger-reconciliation commit is CI-green across backend, migration/RLS, frontend, Compose, shell, and security/dependency checks. F16's live Agent Platform endpoint/credential validation remains an environment-specific production acceptance gate and is not represented as repository evidence.
 
 ## Important distinction
 
