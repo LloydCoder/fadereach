@@ -18,13 +18,13 @@ from outbound_worker import run_outbound_worker
 from retention_worker import run_retention_worker
 
 DB_URL      = os.getenv("DATABASE_URL")
+REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 WORKER_DB_URL = os.getenv("WORKER_DATABASE_URL") or DB_URL
 if ENVIRONMENT == "production" and not os.getenv("WORKER_DATABASE_URL"):
     raise RuntimeError("WORKER_DATABASE_URL must be configured in production")
 if not DB_URL:
     raise RuntimeError("DATABASE_URL must be configured")
-REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
-ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 APP_URL     = os.getenv("APP_URL", "https://fadereach.tinlance.com")
 
 @asynccontextmanager
