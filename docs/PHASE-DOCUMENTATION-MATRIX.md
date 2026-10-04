@@ -15,7 +15,8 @@
 | F10 | campaign lifecycle/autonomy governance |
 | F11 | intelligence/learning/product |
 | F12 | agency |
-| F13 | enterprise |
+| F13 | enterprise, supply-chain evidence |
+
 | F14 | observability/DR/incident response/SLO |
 | F15 | operations/deployment/releases |
 | F16 | autonomy governance/security |
