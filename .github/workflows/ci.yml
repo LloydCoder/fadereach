@@ -48,7 +48,10 @@ jobs:
       - name: Verify Alembic migration chain
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
-        run: cd .. && alembic upgrade head
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "CREATE ROLE fadereach_runtime LOGIN PASSWORD 'runtime-password';"
+          cd .. && alembic upgrade head
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT relrowsecurity FROM pg_class WHERE relname = 'campaigns';" | grep -q t
       - name: Import application
         env:
           ENVIRONMENT: test
