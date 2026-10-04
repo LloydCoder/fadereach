@@ -1,0 +1,5 @@
+"""Phase 20 executable AI evaluation results."""
+from alembic import op
+revision="046_ai_evaluation"; down_revision="045_experimentation_hardening"; branch_labels=None; depends_on=None
+def upgrade(): op.execute("""CREATE TABLE IF NOT EXISTS ai_evaluation_runs (id BIGSERIAL PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,suite_version TEXT NOT NULL,scenario_id TEXT NOT NULL,passed BOOLEAN NOT NULL,score NUMERIC(8,5),severity TEXT NOT NULL CHECK(severity IN('info','low','medium','high','critical')),evidence_refs JSONB NOT NULL DEFAULT '[]'::jsonb,details JSONB NOT NULL DEFAULT '{}'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); ALTER TABLE ai_evaluation_runs ENABLE ROW LEVEL SECURITY; ALTER TABLE ai_evaluation_runs FORCE ROW LEVEL SECURITY; CREATE POLICY ai_evaluation_runs_tenant_isolation ON ai_evaluation_runs USING(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));""")
+def downgrade(): op.execute("DROP TABLE IF EXISTS ai_evaluation_runs CASCADE")
