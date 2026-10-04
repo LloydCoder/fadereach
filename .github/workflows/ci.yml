@@ -84,6 +84,7 @@ jobs:
           N8N_ENCRYPTION_KEY=ci-key
           EOF
       - run: docker compose --env-file .env.ci config --quiet
+          docker compose --env-file .env.ci build api frontend
 
   shell:
     name: Shell syntax
