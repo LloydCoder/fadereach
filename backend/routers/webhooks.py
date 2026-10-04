@@ -13,6 +13,7 @@ PAYSTACK_SECRET_KEY   = os.getenv("PAYSTACK_SECRET_KEY", "")
 PADDLE_WEBHOOK_SECRET = os.getenv("PADDLE_WEBHOOK_SECRET", "")
 RESEND_KEY            = os.getenv("RESEND_API_KEY", "")
 APP_URL               = os.getenv("APP_URL", "https://fadereach.tinlance.com")
+MAX_WEBHOOK_BODY_BYTES = int(os.getenv("MAX_WEBHOOK_BODY_BYTES", str(1024 * 1024)))
 
 def _parse_webhook_json(body: bytes) -> dict:
     if len(body) > MAX_WEBHOOK_BODY_BYTES:
@@ -47,6 +48,13 @@ async def _claim_webhook_event(db, provider: str, event_id: str, payload: dict) 
     return row is not None
 
 
+
+def _mapped_plan(mapping: dict[str, str], provider_id: str, provider: str) -> str:
+    """Resolve a configured billing identifier; never guess a paid plan."""
+    normalized = str(provider_id or "").strip()
+    if not normalized or normalized not in mapping or not mapping[normalized]:
+        raise HTTPException(400, f"Unknown or unconfigured {provider} plan identifier")
+    return mapping[normalized]
 
 # ── Plan mapping per provider ───────────────────
 LS_VARIANT_PLANS = {
