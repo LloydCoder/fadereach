@@ -1,5 +1,6 @@
 """Shared authentication and tenant authorization dependencies."""
 import os
+import ipaddress
 import jwt
 from tenant_context import tenant_id_context
 from fastapi import Depends, HTTPException, Request
@@ -38,6 +39,24 @@ async def get_current_tenant(
         raise HTTPException(403, "Workspace suspended")
     if tenant["status"] == "trial_expired":
         raise HTTPException(403, "Trial expired — upgrade to continue")
+
+    async with request.app.state.db.acquire() as conn:
+        policy = await conn.fetchrow(
+            "SELECT mfa_required, allowed_ip_cidrs FROM enterprise_settings WHERE tenant_id=$1",
+            tenant["id"],
+        )
+    if policy:
+        if policy["mfa_required"] and not payload.get("mfa_verified", False):
+            raise HTTPException(403, "MFA verification required")
+        allowed = policy["allowed_ip_cidrs"] or []
+        if allowed:
+            client_ip = request.client.host if request.client else ""
+            try:
+                address = ipaddress.ip_address(client_ip)
+            except ValueError:
+                raise HTTPException(403, "Client network is not permitted")
+            if not any(address in ipaddress.ip_network(cidr, strict=False) for cidr in allowed):
+                raise HTTPException(403, "Client network is not permitted")
 
     tenant_id_context.set(str(tenant["id"]))
 

@@ -128,7 +128,7 @@ app.include_router(testing_router.router,   prefix="/api/testing",       tags=["
 # here rather than relying on implicit discovery.
 from routers import (
     auth, campaigns, leads, domains, inbox, analytics, admin, tenants, rbac,
-    webhooks, managed, verticals, whitelabel, ecosystem, public_api, nowpayments, providers, intelligence, integrations, graph, autopilot, enterprise, unsubscribe, privacy, agency
+    webhooks, managed, verticals, whitelabel, ecosystem, public_api, nowpayments, providers, intelligence, integrations, graph, autopilot, enterprise, unsubscribe, privacy, agency, enterprise_security
 )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
@@ -144,6 +144,7 @@ app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
 app.include_router(unsubscribe.router, prefix="/api/unsubscribe", tags=["Unsubscribe"])
 app.include_router(privacy.router, prefix="/api/privacy", tags=["Privacy"])
 app.include_router(agency.router, prefix="/api/agency", tags=["Agency"])
+app.include_router(enterprise_security.router, prefix="/api/enterprise-security", tags=["Enterprise Security"])
 app.include_router(managed.router, prefix="/api/managed", tags=["Managed"])
 app.include_router(verticals.router, prefix="/api/verticals", tags=["Verticals"])
 app.include_router(whitelabel.router, prefix="/api/whitelabel", tags=["White Label"])
