@@ -42,7 +42,7 @@ def test_every_tenant_table_has_rls_and_policy():
                 JOIN pg_namespace n ON n.oid = cls.relnamespace
                                   AND n.nspname = 'public'
                 WHERE c.table_schema = 'public' AND c.column_name = 'tenant_id'
-                GROUP BY c.table_name, cls.relrowsecurity
+                GROUP BY c.table_name, cls.relrowsecurity, cls.relforcerowsecurity
             """)
             found = {name: (rls, force_rls, policy) for name, rls, force_rls, policy in cur.fetchall()}
 
