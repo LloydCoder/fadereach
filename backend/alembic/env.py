@@ -10,7 +10,9 @@ config = context.config
 if config.config_file_name:
     fileConfig(config.config_file_name)
 
-url = os.getenv("DATABASE_URL")
+url = os.getenv("MIGRATION_DATABASE_URL") or os.getenv("DATABASE_URL")
+if not url:
+    raise RuntimeError("MIGRATION_DATABASE_URL or DATABASE_URL must be set for Alembic")
 if url:
     config.set_main_option("sqlalchemy.url", url.replace("%", "%%"))
 
