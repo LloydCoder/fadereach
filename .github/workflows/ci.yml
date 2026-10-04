@@ -165,7 +165,7 @@ jobs:
       - name: Generate Python SBOM
         run: |
           python -m pip install --disable-pip-version-check cyclonedx-bom==7.5.0
-          cyclonedx-py requirements -i backend/requirements.txt -o backend-sbom.json --output-format json
+          cyclonedx-py requirements backend/requirements.txt -o backend-sbom.json --of JSON
       - name: Validate SBOM
         run: |
           python - <<'PY'
