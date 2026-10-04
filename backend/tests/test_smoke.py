@@ -4,7 +4,7 @@ from main import app
 
 
 def test_health_route_is_registered():
-    routes = {route.path for route in app.routes if hasattr(route, "path")}
+    routes = set(app.openapi()["paths"])
     assert "/api/health" in routes
 
 
