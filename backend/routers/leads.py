@@ -215,14 +215,17 @@ async def import_leads(
                 await conn.execute("""
                     INSERT INTO leads
                     (tenant_id, email, first_name, last_name, company,
-                     title, domain, linkedin_url, industry, location)
-                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+                     title, domain, linkedin_url, industry, location,
+                     lawful_basis, subscriber_type, consent_status, objection_status)
+                    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
                     ON CONFLICT DO NOTHING
                 """, tenant_id, email,
                     lead.get("first_name"), lead.get("last_name"),
                     lead.get("company"),    lead.get("title"),
                     lead.get("domain"),     lead.get("linkedin_url"),
-                    lead.get("industry"),   lead.get("location"))
+                    lead.get("industry"),   lead.get("location"),
+                    lead.get("lawful_basis"), lead.get("subscriber_type", "unknown"),
+                    lead.get("consent_status", "unknown"), lead.get("objection_status", "unknown"))
                 imported += 1
             except: pass
 
