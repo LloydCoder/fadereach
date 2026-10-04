@@ -98,7 +98,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "dkim_missing",
             "message": "DKIM not configured",
             "fix": "Run setup.sh to generate 2048-bit DKIM key, add TXT record to mail._domainkey",
-            "impact": "-10-15% inbox placement immediately"
+            "impact": "Unauthenticated mail is more likely to be rejected or filtered; placement impact varies by provider and reputation."
         })
     if not dns.get("dmarc"):
         score -= 20
