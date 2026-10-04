@@ -123,8 +123,8 @@ async def ingest_signal(
 
         row = await conn.fetchrow(
             """INSERT INTO intelligence_signals
-               (tenant_id, source, signal_type, company_name, domain, observed_at, score, evidence, external_id)
-               VALUES ($1,$2,$3,$4,$5,COALESCE($6,NOW()),$7,$8::jsonb,$9)
+               (tenant_id, source, signal_type, company_name, domain, observed_at, score, evidence, external_id, source_url, confidence)
+               VALUES ($1,$2,$3,$4,$5,COALESCE($6,NOW()),$7,$8::jsonb,$9,$10,$11)
                ON CONFLICT (tenant_id, source, external_id) DO UPDATE
                SET signal_type=EXCLUDED.signal_type, company_name=EXCLUDED.company_name,
                    domain=EXCLUDED.domain, observed_at=EXCLUDED.observed_at,
@@ -132,6 +132,8 @@ async def ingest_signal(
                RETURNING id""",
             tenant_id, source, signal_type, company_name, domain, observed_at,
             score, json.dumps(evidence), external_id,
+            payload.get("source_url") or payload.get("url"),
+            min(0.95, 0.50 + score / 200),
         )
 
         if account_id:
