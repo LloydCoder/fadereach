@@ -356,14 +356,19 @@ async def _verify_and_score_domain(db, domain_id: int, domain: str, dkim_selecto
         async with db.acquire() as conn:
             await conn.execute("""
                 UPDATE domains
-                SET spf_valid=$1, dkim_valid=$2, dmarc_valid=$3,
-                    health_score=$4, deliverability_readiness=$5,
+                SET spf_valid=$1, dkim_valid=$2, dmarc_valid=$3, mx_valid=$4,
+                    dmarc_policy=$5, ptr_valid=$6,
+                    health_score=$7, deliverability_readiness=$8,
+                    sending_paused=NOT ($1 AND $2 AND $3 AND $4),
+                    pause_reason=CASE WHEN NOT ($1 AND $2 AND $3 AND $4)
+                        THEN 'Sender authentication/DNS controls incomplete' ELSE NULL END,
                     warmup_status=CASE WHEN warmup_status='checking'
-                        THEN CASE WHEN $1 AND $2 THEN 'ready' ELSE 'dns_incomplete' END
+                        THEN CASE WHEN $1 AND $2 AND $3 AND $4 THEN 'ready' ELSE 'dns_incomplete' END
                         ELSE warmup_status END,
-                    last_checked=NOW()
-                WHERE id=$6
-            """, dns["spf"], dns["dkim"], dns["dmarc"],
+                    last_checked=NOW(), last_deliverability_check=NOW()
+                WHERE id=$9
+            """, dns["spf"], dns["dkim"], dns["dmarc"], dns["mx"],
+                dns["dmarc_policy"], dns["ptr"], score, readiness, domain_id)
                 score, readiness, domain_id)
     except Exception as e:
         print(f"Domain verify error [{domain}]: {e}")
