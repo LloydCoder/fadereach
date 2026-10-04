@@ -107,7 +107,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "dmarc_missing",
             "message": "DMARC policy missing",
             "fix": "Add TXT record to _dmarc: v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com",
-            "impact": "Required by Gmail and Yahoo — non-compliance = spam folder"
+            "impact": "Required by major mailbox providers for relevant bulk-sender scenarios; enforcement and placement outcomes vary by provider."
         })
 
     # Bounce rate (20 points)
