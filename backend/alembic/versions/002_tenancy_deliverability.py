@@ -47,7 +47,6 @@ def upgrade():
 
     for table in TENANT_TABLES:
         op.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
-        op.execute(f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY")
         op.execute(
             f"""
             DROP POLICY IF EXISTS {table}_tenant_isolation ON {table};
@@ -85,7 +84,6 @@ def upgrade():
 def downgrade():
     for table in reversed(TENANT_TABLES):
         op.execute(f"DROP POLICY IF EXISTS {table}_tenant_isolation ON {table}")
-        op.execute(f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY")
         op.execute(f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY")
 
     op.execute("""
