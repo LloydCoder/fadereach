@@ -63,6 +63,18 @@ async def ingest_signal(
         if not tenant:
             raise HTTPException(404, "Tenant not found")
 
+        account_id = None
+        if domain:
+            account = await conn.fetchrow(
+                """INSERT INTO accounts (tenant_id, domain, name)
+                   VALUES ($1,$2,$3)
+                   ON CONFLICT (tenant_id, domain)
+                   DO UPDATE SET name=COALESCE(EXCLUDED.name, accounts.name), updated_at=NOW()
+                   RETURNING id""",
+                tenant_id, domain.lower(), company_name,
+            )
+            account_id = account["id"]
+
         row = await conn.fetchrow(
             """INSERT INTO intelligence_signals
                (tenant_id, source, signal_type, company_name, domain, observed_at, score, evidence, external_id)
@@ -76,17 +88,29 @@ async def ingest_signal(
             score, json.dumps(evidence), external_id,
         )
 
+        if account_id:
+            await conn.execute(
+                """INSERT INTO account_signals
+                   (tenant_id, account_id, source, signal_type, score, observed_at, evidence, external_id)
+                   VALUES ($1,$2,$3,$4,$5,COALESCE($6,NOW()),$7::jsonb,$8)
+                   ON CONFLICT (tenant_id, source, external_id)
+                   DO UPDATE SET score=EXCLUDED.score, observed_at=EXCLUDED.observed_at,
+                                 evidence=EXCLUDED.evidence""",
+                tenant_id, account_id, source, signal_type, score, observed_at,
+                json.dumps(evidence), external_id,
+            )
+
         demand_key = next((k for k in DEMAND_MAP if k in signal_type.lower()), None)
         if demand_key:
             demand_type, why_now = DEMAND_MAP[demand_key]
             confidence = min(0.95, 0.50 + score / 200)
             hypothesis = await conn.fetchrow(
                 """INSERT INTO demand_hypotheses
-                   (tenant_id, company_name, domain, why_now, demand_type,
+                   (tenant_id, account_id, company_name, domain, why_now, demand_type,
                     recommended_offer, evidence, confidence)
-                   VALUES ($1,$2,$3,$4,$5,$6,$7::jsonb,$8)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9)
                    RETURNING id""",
-                tenant_id, company_name, domain, why_now, demand_type,
+                tenant_id, account_id, company_name, domain, why_now, demand_type,
                 payload.get("recommended_offer"),
                 json.dumps(evidence + [{"signal_id": row["id"], "source": source, "signal_type": signal_type}]),
                 confidence,
