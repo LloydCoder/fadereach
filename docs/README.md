@@ -39,6 +39,18 @@ TADS and SDEA provide upstream demand/account intelligence. FadeReach converts v
 21. [Enterprise](ENTERPRISE.md)
 22. [Agency](AGENCY.md)
 23. [Release Management](RELEASES.md)
+24. [Production Readiness](PRODUCTION_READINESS.md)
+25. [Access Control](ACCESS_CONTROL.md)
+26. [Outbound Policy](OUTBOUND_POLICY.md)
+27. [Durable Queue Execution](QUEUE_EXECUTION.md)
+28. [AI Governance](AI_GOVERNANCE.md)
+29. [AI Evaluation](AI_EVALUATION.md)
+30. [Privacy Engineering](PRIVACY_ENGINEERING.md)
+31. [Reliability](RELIABILITY.md)
+32. [Risk Register](RISK_REGISTER.md)
+33. [Final Audit Checklist](FINAL_AUDIT_CHECKLIST.md)
+34. [CI Verification](ci-verification.md)
+35. [Phase Gates](phase-gates.md)
 
 ## Integration references
 
