@@ -235,9 +235,9 @@ The CI workflow validates:
 - Docker Compose configuration
 - shell syntax
 
-FastAPI's supported testing model uses `TestClient`/HTTPX and pytest-style tests, which is the direction used for the backend smoke suite. citeturn2search1turn2search0
+The CI workflow runs the backend smoke suite with pytest, verifies the Alembic migration chain, exercises tenant RLS isolation against PostgreSQL, builds the frontend and validates Docker Compose and shell syntax.
 
-GitHub Actions remains the repository's CI execution layer; workflow execution and permissions should remain explicitly scoped. citeturn2search2turn1search10
+For current email-sender requirements, consult Google's [Email sender guidelines](https://support.google.com/mail/answer/81126) before changing deliverability policy.
 
 ## Commercial positioning
 

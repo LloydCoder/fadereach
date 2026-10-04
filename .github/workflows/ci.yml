@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend compile and import
+    name: Backend compile, migration, RLS and tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,13 +52,20 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "CREATE ROLE fadereach_runtime LOGIN PASSWORD 'runtime-password';"
           cd .. && alembic upgrade head
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT relrowsecurity FROM pg_class WHERE relname = 'campaigns';" | grep -q t
-      - name: Import application
+      - name: Verify tenant RLS isolation
+        run: |
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -v ON_ERROR_STOP=1 -c "INSERT INTO tenants (id,email,name,password_hash) VALUES ('ci-tenant-a','a@example.test','Tenant A','test'), ('ci-tenant-b','b@example.test','Tenant B','test') ON CONFLICT (id) DO NOTHING;"
+          PGPASSWORD=runtime-password psql -h localhost -U fadereach_runtime -d fadereach_test -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','ci-tenant-a',false); INSERT INTO campaigns (tenant_id,name,subject) VALUES ('ci-tenant-a','RLS test','RLS test');"
+          PGPASSWORD=runtime-password psql -h localhost -U fadereach_runtime -d fadereach_test -v ON_ERROR_STOP=1 -c "SELECT set_config('app.tenant_id','ci-tenant-b',false); SELECT COUNT(*) FROM campaigns WHERE tenant_id='ci-tenant-a';" | grep -E "[[:space:]]0$"
+      - name: Import application and run tests
         env:
           ENVIRONMENT: test
-          JWT_SECRET: ci-test-secret
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+          JWT_SECRET: ci-test-secret-at-least-32-characters-long
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
           REDIS_URL: redis://localhost:6379/0
-        run: python -c "from main import app; print('routes', len(app.routes))"
+        run: |
+          python -c "from main import app; print('routes', len(app.routes))"
+          pytest -q tests
 
   frontend:
     name: Frontend build

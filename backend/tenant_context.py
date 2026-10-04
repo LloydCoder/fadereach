@@ -1,8 +1,8 @@
-"""Request-local tenant context used to bind PostgreSQL sessions to RLS.
+"""Request-local tenant context used by the database pool.
 
-The context is deliberately separate from JWT claims. Authentication resolves
-the authoritative tenant, then the database pool setup hook copies that
-tenant id into PostgreSQL's session-local app.tenant_id setting.
+Authentication resolves the authoritative tenant first. The tenant-aware pool
+then copies that value into PostgreSQL's app.tenant_id setting for every
+checked-out connection. The context itself is never taken from client input.
 """
 from contextvars import ContextVar
 
