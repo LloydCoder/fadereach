@@ -101,7 +101,7 @@ This ledger also tracks the post-hardening product-completion program. It supers
 | 7 | Why-Now engine | **COMPLETE — CI-green on branch/PR gate** |
 | 8 | Opportunity hypothesis engine | **COMPLETE — CI-green on branch/PR gate** |
 | 9 | Buying committee intelligence | **COMPLETE — CI-green on branch/PR gate** |
-| 10 | Account memory | Pending |
+| 10 | Account memory | **COMPLETE — CI-green on branch/PR gate** |
 | 11 | Revenue intelligence | Pending |
 | 12 | Message intelligence | Pending |
 | 13 | Evidence-backed personalization | Pending |
