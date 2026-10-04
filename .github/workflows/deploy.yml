@@ -1,8 +1,6 @@
 name: FadeReach — Deploy to EC2 Stockholm
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 env:
