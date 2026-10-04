@@ -60,6 +60,14 @@ async def get_account_graph(
                ORDER BY updated_at DESC LIMIT 100""",
             tenant_id, account["id"],
         )
+        memory = await conn.fetch(
+            """SELECT id, memory_type, content, confidence, evidence_refs, source_refs,
+                      valid_from, valid_to, status, updated_at
+               FROM account_memory_entries
+               WHERE tenant_id=$1 AND account_id=$2 AND status='active'
+               ORDER BY updated_at DESC LIMIT 200""",
+            tenant_id, account["id"],
+        )
         committee = await conn.fetchrow(
             """SELECT bc.id, bc.status, bc.confidence, bc.updated_at
                FROM buying_committees bc
@@ -108,6 +116,7 @@ async def get_account_graph(
         "edges": [dict(row) for row in edges],
         "why_now": dict(why_now) if why_now else None,
         "buying_committee": dict(committee) if committee else None,
+        "memory": [dict(row) for row in memory],
         "graph_semantics": {
             "account": "company/entity",
             "people": "buyer/contact",
