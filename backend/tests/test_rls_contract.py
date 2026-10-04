@@ -46,7 +46,8 @@ def test_every_tenant_table_has_rls_and_policy():
             """)
             found = {name: (rls, policy) for name, rls, policy in cur.fetchall()}
 
-    assert not TENANT_TABLES - found.keys()
+    assert not TENANT_TABLES - found.keys(), sorted(TENANT_TABLES - found.keys())
+    assert not found.keys() - TENANT_TABLES, sorted(found.keys() - TENANT_TABLES)
     assert not [name for name in TENANT_TABLES if not all(found[name])]
 
 
