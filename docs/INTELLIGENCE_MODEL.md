@@ -1,32 +1,12 @@
 # Intelligence Model
 
-## Evidence hierarchy
-
-FadeReach separates:
-
+## Evidence chain
 Observation → Evidence → Signal → Interpretation → Hypothesis → Action → Outcome.
 
-An observation is what was seen. Evidence is a provenance-bearing artifact supporting an observation. A signal is a normalized meaningful change. An interpretation/hypothesis is reasoning over evidence. An action is a controlled execution. An outcome is what actually happened.
+Observation is what was seen. Evidence is provenance-bearing support. Signal is a normalized meaningful change. Interpretation/hypothesis is reasoning. Action is controlled execution. Outcome is what happened.
 
-## Required provenance
+Evidence should preserve source, source reference, observed time, retrieval time, extraction method and quality/confidence metadata where available.
 
-Evidence should preserve source, observed time, retrieval time, source location/reference, extraction method and confidence/quality metadata where available.
+A recommendation should explain account fit, observable trigger, supporting evidence, buyer/problem hypothesis, offer/angle, uncertainty and proposed action.
 
-## No hallucinated authority
-
-AI-generated reasoning MUST NOT overwrite source facts. Unknown remains unknown. Missing evidence is not evidence of absence.
-
-## Why-now
-
-An outbound recommendation should explain:
-- account/ICP fit
-- observable trigger
-- evidence
-- likely buyer/problem hypothesis
-- offer/angle
-- confidence and uncertainty
-- proposed action
-
-## Learning
-
-Outcome data feeds experiment and revenue attribution. The system should distinguish correlation from causation and avoid treating a single successful campaign as universal proof.
+AI reasoning must not overwrite source facts. Unknown remains unknown. Missing evidence is not evidence of absence.
