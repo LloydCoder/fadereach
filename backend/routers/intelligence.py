@@ -155,8 +155,9 @@ async def get_lead_intelligence(
         saved = await conn.fetchrow(
             """INSERT INTO lead_intelligence
                (tenant_id, lead_id, fit_score, why_now, buyer_hypothesis,
-                problem_hypothesis, offer_angle, evidence, confidence, model_version)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)
+                problem_hypothesis, offer_angle, evidence, confidence, model_version,
+                evidence_status, evidence_contract_version, evidence_freshness_days)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13)
                ON CONFLICT (tenant_id, lead_id)
                DO UPDATE SET fit_score=EXCLUDED.fit_score,
                              why_now=EXCLUDED.why_now,
@@ -175,6 +176,8 @@ async def get_lead_intelligence(
             intelligence["buyer_hypothesis"], intelligence["problem_hypothesis"],
             intelligence["offer_angle"], json.dumps(intelligence["evidence"]),
             intelligence["confidence"], intelligence["model_version"],
+            intelligence["evidence_status"], intelligence["evidence_contract_version"],
+            intelligence["evidence_freshness_days"],
         )
 
     return {"lead_id": lead_id, "intelligence_id": saved["id"], **intelligence}
