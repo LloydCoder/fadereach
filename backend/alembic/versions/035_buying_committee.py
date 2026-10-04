@@ -15,6 +15,7 @@ def upgrade() -> None:
             ADD COLUMN IF NOT EXISTS last_verified_at TIMESTAMPTZ;
 
         CREATE TABLE IF NOT EXISTS buying_committee_member_evidence (
+            tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
             member_id BIGINT NOT NULL REFERENCES buying_committee_members(id) ON DELETE CASCADE,
             evidence_id BIGINT NOT NULL REFERENCES evidence(id) ON DELETE CASCADE,
             relation TEXT NOT NULL DEFAULT 'supports'
@@ -33,20 +34,8 @@ def upgrade() -> None:
 
         CREATE POLICY buying_committee_member_evidence_tenant_isolation
             ON buying_committee_member_evidence
-            USING (
-                EXISTS (
-                    SELECT 1 FROM buying_committee_members bcm
-                    WHERE bcm.id = buying_committee_member_evidence.member_id
-                      AND bcm.tenant_id::text = NULLIF(current_setting('app.tenant_id', true), '')
-                )
-            )
-            WITH CHECK (
-                EXISTS (
-                    SELECT 1 FROM buying_committee_members bcm
-                    WHERE bcm.id = buying_committee_member_evidence.member_id
-                      AND bcm.tenant_id::text = NULLIF(current_setting('app.tenant_id', true), '')
-                )
-            );
+            USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
+            WITH CHECK (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''));
     """)
 
 def downgrade() -> None:
