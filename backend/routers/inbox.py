@@ -166,12 +166,13 @@ async def ingest_reply(
     Auto-classifies intent, detects hot leads, stops sequence
     """
     db = request.app.state.db
+    reply_id = None
 
     # Classify intent (fast, rule-based)
     intent, sentiment = classify_intent(req.body)
 
     # Tenant identity comes from the authenticated session, never from the request body.
-    tenant_id = auth["id"]
+    tenant_id = auth["sub"]
     is_hot = intent in ["interested", "more_info", "referral"]
 
     # Find lead
@@ -192,11 +193,16 @@ async def ingest_reply(
 
             # Auto-stop sequence — remove from active campaign
             if req.campaign_id:
-                await conn.execute("""
-                    UPDATE campaigns
-                    SET replies = replies + 1, updated_at = NOW()
-                    WHERE id=$1
-                """, req.campaign_id)
+                campaign = await conn.fetchrow(
+                    "SELECT id FROM campaigns WHERE id=$1 AND tenant_id=$2",
+                    req.campaign_id, tenant_id,
+                )
+                if not campaign:
+                    raise HTTPException(404, "Campaign not found")
+                await conn.execute(
+                    "UPDATE campaigns SET replies = replies + 1, updated_at = NOW() WHERE id=$1 AND tenant_id=$2",
+                    req.campaign_id, tenant_id,
+                )
 
             # Save reply
             reply_id = await conn.fetchval("""
