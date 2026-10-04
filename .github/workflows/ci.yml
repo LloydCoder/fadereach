@@ -34,6 +34,15 @@ jobs:
           --health-interval=5s
           --health-timeout=5s
           --health-retries=20
+      redis:
+        image: redis:7.4.11-alpine3.21
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=5s
+          --health-timeout=3s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -47,7 +56,8 @@ jobs:
         run: python -m compileall -q .
       - name: Verify Alembic migration chain
         env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
+          MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
+          DATABASE_URL: postgresql://fadereach_runtime:runtime-password@localhost:5432/fadereach_test
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "CREATE ROLE fadereach_runtime LOGIN PASSWORD 'runtime-password';"
           cd .. && alembic upgrade head
@@ -61,7 +71,8 @@ jobs:
         env:
           ENVIRONMENT: test
           JWT_SECRET: ci-test-secret-at-least-32-characters-long
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
+          DATABASE_URL: postgresql://fadereach_runtime:runtime-password@localhost:5432/fadereach_test
+          MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
           REDIS_URL: redis://localhost:6379/0
         run: |
           python -c "from main import app; print('routes', len(app.routes))"
