@@ -14,6 +14,24 @@ PADDLE_WEBHOOK_SECRET = os.getenv("PADDLE_WEBHOOK_SECRET", "")
 RESEND_KEY            = os.getenv("RESEND_API_KEY", "")
 APP_URL               = os.getenv("APP_URL", "https://fadereach.tinlance.com")
 
+def _parse_webhook_json(body: bytes) -> dict:
+    if len(body) > MAX_WEBHOOK_BODY_BYTES:
+        raise HTTPException(413, "Webhook payload too large")
+    try:
+        data = json.loads(body)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "Invalid webhook JSON")
+    if not isinstance(data, dict):
+        raise HTTPException(400, "Webhook payload must be an object")
+    return data
+
+
+def _require_event_id(event_id: str) -> str:
+    if not event_id or event_id.endswith(":"):
+        raise HTTPException(400, "Webhook event identifier is required")
+    return event_id
+
+
 async def _claim_webhook_event(db, provider: str, event_id: str, payload: dict) -> bool:
     """Atomically claim an event; duplicate deliveries become no-ops."""
     if not event_id:
@@ -71,9 +89,9 @@ async def lemonsqueezy_webhook(
     if not hmac.compare_digest(f"sha256={expected}", x_signature or ""):
             raise HTTPException(401, "Invalid LemonSqueezy signature")
 
-    data       = json.loads(body)
+    data       = _parse_webhook_json(body)
     event_type = data.get("meta", {}).get("event_name", "")
-    event_id   = f"{event_type}:{data.get('data', {}).get('id', '')}"
+    event_id   = _require_event_id(f"{event_type}:{data.get('data', {}).get('id', '')}")
     db         = request.app.state.db
     if not await _claim_webhook_event(db, "lemonsqueezy", event_id, data):
         return {"received": True, "duplicate": True}
@@ -128,9 +146,9 @@ async def paystack_webhook(
     if not hmac.compare_digest(expected, x_paystack_signature or ""):
             raise HTTPException(401, "Invalid Paystack signature")
 
-    data  = json.loads(body)
+    data  = _parse_webhook_json(body)
     event = data.get("event", "")
-    event_id = f"{event}:{data.get('data', {}).get('id', '')}"
+    event_id = _require_event_id(f"{event}:{data.get('data', {}).get('id', '')}")
     db = request.app.state.db
     if not await _claim_webhook_event(db, "paystack", event_id, data):
         return {"received": True, "duplicate": True}
@@ -177,9 +195,9 @@ async def paddle_webhook(
     if not _verify_paddle_signature(body, paddle_signature or "", PADDLE_WEBHOOK_SECRET):
             raise HTTPException(401, "Invalid Paddle signature")
 
-    data       = json.loads(body)
+    data       = _parse_webhook_json(body)
     event_type = data.get("event_type", "")
-    event_id   = str(data.get("event_id", ""))
+    event_id   = _require_event_id(str(data.get("event_id", "")))
     try:
         ts = int(dict(p.split("=", 1) for p in (paddle_signature or "").split(";") if "=" in p).get("ts", "0"))
         if abs(datetime.now(timezone.utc).timestamp() - ts) > 300:

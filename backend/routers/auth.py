@@ -22,12 +22,12 @@ APP_URL      = os.getenv("APP_URL", "https://fadereach.tinlance.com")
 class SignupReq(BaseModel):
     email: EmailStr
     name: str
-    password: str = Field(min_length=12, max_length=128)
+    password: str = Field(min_length=15, max_length=72)
     company: str | None = None
 
 class LoginReq(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=72)
 
 def make_token(tenant_id: str, plan: str) -> str:
     now = datetime.utcnow()
@@ -37,6 +37,22 @@ def make_token(tenant_id: str, plan: str) -> str:
          "iss": "fadereach", "aud": "fadereach-api"},
         JWT_SECRET, algorithm="HS256"
     )
+
+async def _rate_limit(request: Request, bucket: str, limit: int, window: int) -> None:
+    """Fail closed on malformed Redis state, but do not turn Redis outage into auth outage."""
+    redis = request.app.state.redis
+    key = f"auth_rl:{bucket}"
+    try:
+        count = await redis.incr(key)
+        if count == 1:
+            await redis.expire(key, window)
+        if count > limit:
+            raise HTTPException(429, "Too many authentication attempts; try again later")
+    except HTTPException:
+        raise
+    except Exception:
+        return
+
 
 async def send_welcome_email(email: str, name: str):
     """Resend — existing Tinlance KalevioAI account"""
@@ -96,6 +112,8 @@ async def enqueue_provisioning(db, tenant_id: str, plan: str):
 
 @router.post("/signup")
 async def signup(req: SignupReq, background_tasks: BackgroundTasks, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    await _rate_limit(request, f"signup:{client_ip}", 5, 600)
     db = request.app.state.db
     tenant_id = gen_id()
     pw_hash   = bcrypt.hashpw(req.password.encode(), bcrypt.gensalt()).decode()
@@ -126,6 +144,8 @@ async def signup(req: SignupReq, background_tasks: BackgroundTasks, request: Req
 
 @router.post("/login")
 async def login(req: LoginReq, request: Request):
+    client_ip = request.client.host if request.client else "unknown"
+    await _rate_limit(request, f"login:{client_ip}:{req.email.lower()}", 10, 300)
     db = request.app.state.db
     async with db.acquire() as conn:
         row = await conn.fetchrow(

@@ -91,7 +91,7 @@ async def get_api_tenant(
     }
 
     # Cache for 5 minutes
-    await redis.setex(cache_key, 300, json.dumps(key_data))
+    await redis.setex(cache_key, 60, json.dumps(key_data))
 
     # Update last used
     async with db.acquire() as conn:
@@ -197,6 +197,8 @@ async def api_list_leads(
     if "leads:read" not in api_auth["scopes"]:
         raise HTTPException(403, "Scope 'leads:read' required")
 
+    limit = max(1, min(limit, 100))
+    offset = max(0, min(offset, 1_000_000))
     db = request.app.state.db
     async with db.acquire() as conn:
         where  = "WHERE tenant_id=$1"

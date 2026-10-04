@@ -5,12 +5,14 @@ EC2 Stockholm 13.50.16.19 | Port 8001
 """
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import asyncpg, redis.asyncio as aioredis
 import os
 from datetime import datetime
 from tenant_context import tenant_id_context
 from db import TenantAwarePool
+from middleware.security import SecurityHeadersMiddleware, allowed_hosts
 
 DB_URL      = os.getenv("DATABASE_URL")
 if not DB_URL:
@@ -38,6 +40,8 @@ app = FastAPI(
     docs_url="/api/docs" if ENVIRONMENT == "development" else None,
 )
 
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.middleware("http")
