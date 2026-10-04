@@ -12,7 +12,7 @@ TENANT_TABLES = {
     "messages", "message_events", "lead_intelligence",
     "intelligence_signals", "demand_hypotheses", "accounts",
     "account_signals", "autopilot_runs", "ai_feedback",
-    "optimization_log", "enterprise_settings", "execution_jobs", "tenant_data_policies",
+    "optimization_log", "enterprise_settings", "execution_jobs", "tenant_data_policies", "account_aliases",
 }
 
 
