@@ -103,6 +103,8 @@ jobs:
           JWT_SECRET=ci-jwt-secret-at-least-32-characters
           CREDENTIAL_ENCRYPTION_KEY=ci-credential-key-at-least-32-characters
           POSTGRES_RUNTIME_PASSWORD=ci-runtime-password
+          N8N_DB_PASSWORD=ci-n8n-db-password
+          LISTMONK_DB_PASSWORD=ci-listmonk-db-password
           LISTMONK_ADMIN_PASSWORD=ci-password
           N8N_ENCRYPTION_KEY=ci-n8n-key-at-least-32-characters
           EOF
