@@ -25,8 +25,7 @@ def upgrade() -> None:
         CREATE INDEX IF NOT EXISTS idx_opportunities_source_key
             ON opportunities(tenant_id, organization_id, source_key);
         CREATE UNIQUE INDEX IF NOT EXISTS uq_opportunity_source_key
-            ON opportunities(tenant_id, organization_id, source_key)
-            WHERE source_key IS NOT NULL;
+            ON opportunities(tenant_id, organization_id, source_key);
         CREATE INDEX IF NOT EXISTS idx_hypotheses_priority
             ON opportunity_hypotheses(tenant_id, priority_score DESC, updated_at DESC);
     """)
