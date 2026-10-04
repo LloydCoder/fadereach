@@ -1,73 +1,75 @@
-name: FadeReach — Deploy to EC2 Stockholm
+name: FadeReach — Production Deploy
 
 on:
   workflow_dispatch:
 
-env:
-  EC2_HOST: 13.50.16.19
-  EC2_USER: ubuntu
-  APP_DIR:  /opt/fadereach
+permissions:
+  contents: read
+
+concurrency:
+  group: fadereach-production-deploy
+  cancel-in-progress: false
 
 jobs:
   deploy:
-    name: Deploy Phase 1
+    name: Deploy to production host
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install dependencies (verify syntax)
-        working-directory: backend
+      - name: Validate deployment configuration
         run: |
-          pip install -r requirements.txt --quiet
-          python -m py_compile main.py
-          echo "✓ Backend syntax OK"
+          test -f docker-compose.yml
+          test -f backend/Dockerfile
+          test -f frontend/Dockerfile
+          test -f frontend/nginx.conf
+          test -f infrastructure/postgres/init/01-databases.sql
 
-      - name: Deploy to EC2
+      - name: Verify Compose configuration
+        run: |
+          cat > .env.ci <<'EOF'
+          POSTGRES_PASSWORD=ci-postgres-password
+          JWT_SECRET=ci-jwt-secret-at-least-32-characters
+          N8N_ENCRYPTION_KEY=ci-n8n-key-at-least-32-characters
+          LISTMONK_ADMIN_PASSWORD=ci-listmonk-password
+          EOF
+          docker compose --env-file .env.ci config --quiet
+
+      - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host:        ${{ env.EC2_HOST }}
-          username:    ${{ env.EC2_USER }}
-          key:         ${{ secrets.EC2_SSH_KEY }}
-          timeout:     120s
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          timeout: 180s
+          command_timeout: 15m
           script: |
-            set -e
-            echo "── Pulling latest code ──"
-            cd ${{ env.APP_DIR }}
-            git pull origin main
+            set -euo pipefail
+            cd /opt/fadereach
 
-            echo "── Installing Python deps ──"
-            cd backend
-            pip install -r requirements.txt --quiet --break-system-packages
+            git fetch origin main
+            git checkout main
+            git reset --hard origin/main
 
-            echo "── Restarting FadeReach API ──"
-            sudo systemctl restart fadereach-api
-            sleep 3
+            test -f .env
 
-            echo "── Health check ──"
-            curl -sf http://localhost:8001/api/health | python3 -m json.tool
-            echo "✓ FadeReach API deployed successfully"
+            docker compose --env-file .env config --quiet
+            docker compose --env-file .env build --pull api frontend
+            docker compose --env-file .env up -d --remove-orphans
 
-      - name: Notify deployment
-        if: success()
-        run: |
-          curl -s -X POST ${{ secrets.SLACK_WEBHOOK }} \
-            -H 'Content-type: application/json' \
-            -d '{
-              "text": "✅ *FadeReach deployed* to fadereach.tinlance.com\nCommit: `${{ github.sha }}`\nBy: ${{ github.actor }}"
-            }' || true
+            docker compose --env-file .env ps
 
-      - name: Notify failure
-        if: failure()
-        run: |
-          curl -s -X POST ${{ secrets.SLACK_WEBHOOK }} \
-            -H 'Content-type: application/json' \
-            -d '{
-              "text": "❌ *FadeReach deploy FAILED*\nCommit: `${{ github.sha }}`\nCheck: ${{ github.server_url }}/${{ github.repository }}/actions"
-            }' || true
+            for i in $(seq 1 30); do
+              if curl -fsS http://127.0.0.1:8000/api/health >/tmp/fadereach-health.json; then
+                cat /tmp/fadereach-health.json
+                exit 0
+              fi
+              sleep 5
+            done
+
+            docker compose --env-file .env ps
+            docker compose --env-file .env logs --tail=100 api
+            exit 1
