@@ -11,7 +11,7 @@ services:
     environment:
       ENVIRONMENT: production
       APP_URL: https://fadereach.app
-      DATABASE_URL: postgresql://fadereach:${POSTGRES_PASSWORD}@postgres:5432/fadereach_meta
+      DATABASE_URL: postgresql://fadereach_runtime:${POSTGRES_RUNTIME_PASSWORD}@postgres:5432/fadereach_meta
       JWT_SECRET: ${JWT_SECRET}
       REDIS_URL: redis://redis:6379/0
       HUNTER_API_KEY: ${HUNTER_API_KEY:-}
@@ -61,6 +61,7 @@ services:
       POSTGRES_DB: fadereach_meta
       POSTGRES_USER: fadereach
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_RUNTIME_PASSWORD: ${POSTGRES_RUNTIME_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
