@@ -255,6 +255,39 @@ async def add_domain(
         "dns_records_needed": _get_dns_guide(req.domain)
     }
 
+@router.post("/{domain_id}/pause")
+async def pause_domain(domain_id: int, request: Request, auth: dict = Depends(get_current_tenant)):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            "UPDATE domains SET sending_paused=TRUE, pause_reason='Manually paused', last_deliverability_check=NOW() WHERE id=$1 AND tenant_id=$2 RETURNING id",
+            domain_id, auth["sub"],
+        )
+    if not row:
+        raise HTTPException(404, "Domain not found")
+    return {"domain_id": domain_id, "sending_paused": True}
+
+
+@router.post("/{domain_id}/resume")
+async def resume_domain(domain_id: int, request: Request, auth: dict = Depends(get_current_tenant)):
+    db = request.app.state.db
+    async with db.acquire() as conn:
+        row = await conn.fetchrow(
+            """SELECT id, spf_valid, dkim_valid, dmarc_valid, mx_valid
+               FROM domains WHERE id=$1 AND tenant_id=$2""",
+            domain_id, auth["sub"],
+        )
+        if not row:
+            raise HTTPException(404, "Domain not found")
+        if not all([row["spf_valid"], row["dkim_valid"], row["dmarc_valid"], row["mx_valid"]]):
+            raise HTTPException(409, "Sender authentication and MX checks must pass before resuming")
+        await conn.execute(
+            "UPDATE domains SET sending_paused=FALSE, pause_reason=NULL, updated_at=NOW() WHERE id=$1 AND tenant_id=$2",
+            domain_id, auth["sub"],
+        )
+    return {"domain_id": domain_id, "sending_paused": False}
+
+
 @router.get("")
 async def list_domains(request: Request, auth: dict = Depends(get_current_tenant)):
     db = request.app.state.db
@@ -263,7 +296,7 @@ async def list_domains(request: Request, auth: dict = Depends(get_current_tenant
             SELECT id, domain, spf_valid, dkim_valid, dmarc_valid, mx_valid,
                    warmup_day, warmup_status, daily_limit, sent_today,
                    bounce_rate, complaint_rate, health_score, deliverability_readiness,
-                   blacklisted, last_checked
+                   sending_paused, pause_reason, last_checked, last_deliverability_check
             FROM domains WHERE tenant_id=$1 ORDER BY added_at DESC
         """, auth["sub"])
     return {"domains": [dict(r) for r in rows]}
