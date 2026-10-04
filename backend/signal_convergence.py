@@ -85,3 +85,110 @@ def compute_convergence(signals: Iterable[dict], now: datetime | None = None) ->
         "state": state,
         "contributions": contributions,
     }
+
+
+async def persist_signal_and_convergence(conn, tenant_id: str, organization_id: int, signal_row: dict, trust_tier: str = "T2") -> dict:
+    """Persist one canonical signal and recompute its organization/type cluster."""
+    normalized_type = signal_row.get("normalized_type") or signal_row.get("signal_type") or "unknown"
+    external_id = signal_row.get("external_id")
+    source = signal_row.get("source") or "unknown"
+    observed_at = signal_row.get("observed_at")
+    score = max(0.0, min(100.0, float(signal_row.get("score") or 0)))
+    async with conn.transaction():
+        existing = await conn.fetchrow(
+            """SELECT id, first_seen_at FROM signals
+               WHERE tenant_id=$1 AND organization_id=$2 AND normalized_type=$3
+                 AND source=$4 AND attributes->>'external_id'=$5
+               LIMIT 1""",
+            tenant_id, organization_id, normalized_type, source, external_id or "",
+        )
+        if existing:
+            signal_id = existing["id"]
+            await conn.execute(
+                """UPDATE signals
+                   SET strength=$1, confidence=$2, last_seen_at=$3,
+                       source_independence_key=$4, signal_category=$5,
+                       attributes=attributes || $6::jsonb, updated_at=NOW()
+                   WHERE id=$7 AND tenant_id=$8""",
+                score, float(signal_row.get("confidence") or 0),
+                observed_at or datetime.now(timezone.utc),
+                source, signal_row.get("signal_category") or "other",
+                {"external_id": external_id, "source_url": signal_row.get("source_url")},
+                signal_id, tenant_id,
+            )
+        else:
+            signal_id = await conn.fetchval(
+                """INSERT INTO signals
+                   (tenant_id, organization_id, source, normalized_type, signal_category,
+                    source_independence_key, polarity, strength, confidence,
+                    first_seen_at, last_seen_at, attributes)
+                   VALUES ($1,$2,$3,$4,$5,$3,1,$6,$7,
+                           COALESCE($8,NOW()),COALESCE($8,NOW()),$9::jsonb)
+                   RETURNING id""",
+                tenant_id, organization_id, source, normalized_type,
+                signal_row.get("signal_category") or "other", score,
+                float(signal_row.get("confidence") or 0),
+                observed_at,
+                {"external_id": external_id, "source_url": signal_row.get("source_url")},
+            )
+
+        rows = await conn.fetch(
+            """SELECT s.id, s.source, s.strength, s.polarity, s.last_seen_at,
+                      s.confidence, ss.trust_tier
+               FROM signals s
+               LEFT JOIN signal_sources ss
+                 ON ss.tenant_id=s.tenant_id AND ss.source_key=s.source
+               WHERE s.tenant_id=$1 AND s.organization_id=$2
+                 AND s.normalized_type=$3
+                 AND s.last_seen_at >= NOW() - INTERVAL '90 days'
+               ORDER BY s.last_seen_at DESC""",
+            tenant_id, organization_id, normalized_type,
+        )
+        result = compute_convergence([dict(row) for row in rows])
+        cluster = await conn.fetchrow(
+            """SELECT id FROM signal_clusters
+               WHERE tenant_id=$1 AND organization_id=$2 AND cluster_type=$3
+               ORDER BY updated_at DESC LIMIT 1
+               FOR UPDATE""",
+            tenant_id, organization_id, normalized_type,
+        )
+        if cluster:
+            cluster_id = cluster["id"]
+            await conn.execute(
+                """UPDATE signal_clusters
+                   SET convergence_score=$1, confidence=$2,
+                       independent_source_count=$3, state=$4,
+                       contradiction_count=$5, decay_score=$6,
+                       rationale=$7::jsonb, last_seen_at=NOW(), evaluated_at=NOW(),
+                       updated_at=NOW()
+                   WHERE id=$8 AND tenant_id=$9""",
+                result["convergence_score"], result["confidence"],
+                result["independent_source_count"], result["state"],
+                result["contradiction_count"], result["contradiction_score"],
+                result, cluster_id, tenant_id,
+            )
+        else:
+            cluster_id = await conn.fetchval(
+                """INSERT INTO signal_clusters
+                   (tenant_id, organization_id, cluster_type, convergence_score, confidence,
+                    independent_source_count, state, first_seen_at, last_seen_at,
+                    contradiction_count, decay_score, rationale, evaluated_at)
+                   VALUES ($1,$2,$3,$4,$5,$6,$7,NOW(),NOW(),$8,$9,$10::jsonb,NOW())
+                   RETURNING id""",
+                tenant_id, organization_id, normalized_type,
+                result["convergence_score"], result["confidence"],
+                result["independent_source_count"], result["state"],
+                result["contradiction_count"], result["contradiction_score"],
+                result,
+            )
+        await conn.execute("DELETE FROM signal_cluster_members WHERE cluster_id=$1", cluster_id)
+        for item in result["contributions"]:
+            if item.get("signal_id"):
+                await conn.execute(
+                    """INSERT INTO signal_cluster_members(cluster_id, signal_id, contribution)
+                       VALUES ($1,$2,$3)
+                       ON CONFLICT (cluster_id, signal_id)
+                       DO UPDATE SET contribution=EXCLUDED.contribution""",
+                    cluster_id, item["signal_id"], item["contribution"],
+                )
+    return {"signal_id": signal_id, "cluster_id": cluster_id, **result}
