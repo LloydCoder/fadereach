@@ -229,7 +229,7 @@ async def opportunity_action(
                     }
                 )
             return {"action": "verified", "result": resp.json()}
-        except:
+        except Exception:
             return {"action": "verified", "result": {"error": "verifier_unavailable"}}
 
     raise HTTPException(400, f"Unknown action: {req.action}")
@@ -275,7 +275,7 @@ async def _build_opportunity_feed(
     dismissed = await redis.smembers(f"dismissed:{tenant_id}") or set()
 
     # ── SOURCE 1: Olvrix fadereach_sync bridge ─────
-    # Largest data generator — agencies + SMB contacts
+    # Largest configured data bridge — agencies + SMB contacts
     olvrix_opps = await _fetch_olvrix_signals(tenant_id)
     all_opportunities.extend(olvrix_opps)
 
