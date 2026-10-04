@@ -1,7 +1,7 @@
 """FadeReach — Auth Router | Signup · Login · Welcome"""
 from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from pydantic import BaseModel, EmailStr
-import bcrypt, jwt, os, json, subprocess
+import bcrypt, jwt, os, json
 from datetime import datetime, timedelta
 
 try:
@@ -78,24 +78,19 @@ async def send_welcome_email(email: str, name: str):
     except Exception as e:
         print(f"Welcome email failed: {e}")
 
-async def provision_listmonk(db, tenant_id: str, plan: str):
-    """Background: spin up Docker Listmonk per tenant"""
-    try:
-        result = subprocess.run(
-            ["bash", "/opt/fadereach/infrastructure/provision_tenant.sh",
-             tenant_id, f"{tenant_id}.fadereach.tinlance.com", plan],
-            capture_output=True, text=True, timeout=120
+async def enqueue_provisioning(db, tenant_id: str, plan: str):
+    """Queue provisioning for an isolated worker; never execute host commands in API."""
+    async with db.acquire() as conn:
+        await conn.execute(
+            """INSERT INTO provisioning_jobs (tenant_id, job_type, payload)
+               VALUES ($1, 'listmonk', $2::jsonb)""",
+            tenant_id,
+            json.dumps({
+                "plan": plan,
+                "tenant_domain": f"{tenant_id}.fadereach.tinlance.com",
+            }),
         )
-        if result.returncode == 0:
-            data = json.loads(result.stdout)
-            async with db.acquire() as conn:
-                await conn.execute("""
-                    UPDATE tenants
-                    SET listmonk_url=$1, listmonk_port=$2, updated_at=NOW()
-                    WHERE id=$3
-                """, data["listmonk_url"], data["port"], tenant_id)
-    except Exception as e:
-        print(f"Listmonk provision failed [{tenant_id}]: {e}")
+
 
 @router.post("/signup")
 async def signup(req: SignupReq, background_tasks: BackgroundTasks, request: Request):
@@ -116,7 +111,7 @@ async def signup(req: SignupReq, background_tasks: BackgroundTasks, request: Req
         """, tenant_id, req.email, req.name, req.company, pw_hash)
 
     background_tasks.add_task(send_welcome_email, req.email, req.name)
-    background_tasks.add_task(provision_listmonk, db, tenant_id, "trial")
+    background_tasks.add_task(enqueue_provisioning, db, tenant_id, "trial")
 
     return {
         "token":         make_token(tenant_id, "trial"),
