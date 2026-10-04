@@ -116,7 +116,7 @@ jobs:
           EOF
       - run: |
           docker compose --env-file .env.ci config --quiet
-          docker compose --env-file .env.ci build api frontend
+          docker compose --env-file .env.ci build api worker frontend
 
   shell:
     name: Shell syntax

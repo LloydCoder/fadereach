@@ -14,6 +14,7 @@ FadeReach currently supports a simple single-host Docker Compose production topo
 - production environment secrets
 - backups configured
 - CI green on the commit being promoted
+- worker service included in the Compose topology
 
 ## Bootstrap
 
@@ -49,3 +50,7 @@ Rollback is a controlled operation. Revert application code to a known-good comm
 ## Post-deploy
 
 Verify authentication, tenant isolation, campaign state, provider connectivity, webhook processing, suppression enforcement and health endpoints. Record evidence in the deployment/incident record.
+
+## Process separation
+
+The API image never mutates the database schema during application startup and never starts durable workers. Production promotion applies Alembic explicitly before `docker compose up`. The `worker` service runs outbound execution and retention enforcement independently so increasing API replicas cannot multiply background workers.

@@ -42,7 +42,7 @@ Learning + attribution
 
 ## Runtime components
 
-- FastAPI: authoritative application/control API.
+- FastAPI: authoritative application/control API; it does not run durable background workers.
 - PostgreSQL: authoritative durable application state and tenancy boundary.
 - Alembic: schema migration authority.
 - Redis/Valkey: transient/cache/queue support where configured; it is not the source of truth.
@@ -50,6 +50,7 @@ Learning + attribution
 - n8n: integration/automation adapter, not the authoritative runtime.
 - React/Vite: web application.
 - Nginx/Cloudflare: edge/TLS layer.
+- Dedicated worker process: durable outbound execution and retention enforcement, scaled independently from HTTP API workers.
 - Docker Compose/systemd: current single-host deployment primitives.
 
 ## Authority boundaries
@@ -62,6 +63,8 @@ FadeReach owns application state, tenant/resource authorization, campaign state,
 2. Edge → API.
 3. API → PostgreSQL.
 4. API/workers → Redis.
+5. API → dedicated worker via PostgreSQL-backed durable state; the API does not own worker lifecycle.
+6. Worker → PostgreSQL/provider infrastructure.
 5. API/workers → outbound providers.
 6. Provider → webhook ingress.
 7. Tenant user → application.
