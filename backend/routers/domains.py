@@ -65,7 +65,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
                             complaint_rate: float, warmup_day: int) -> tuple[int, int, list]:
     """
     Deliverability Copilot — core scoring logic
-    Returns: (health_score 0-100, inbox_probability 0-100, issues[])
+    Returns: (health_score 0-100, deliverability_readiness 0-100, issues[])
     """
     score  = 100
     issues = []
@@ -149,15 +149,16 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "impact": "Sending above limit will damage reputation before it is established"
         })
 
-    # Calculate inbox probability
-    inbox_prob = min(95, max(20, score))
+    # Deliverability readiness is a bounded readiness indicator, not a prediction
+    # of inbox placement. It reflects observable controls and recent metrics.
+    readiness = min(100, max(0, score))
     if warmup_day < 14:
-        inbox_prob = min(inbox_prob, 75)
+        readiness = min(readiness, 75)
 
-    return max(0, score), inbox_prob, issues
+    return max(0, score), readiness, issues
 
 async def generate_copilot_explanation(
-    domain: str, score: int, inbox_prob: int, issues: list
+    domain: str, score: int, readiness: int, issues: list
 ) -> str:
     """
     Deliverability Copilot — AI explains health in plain English
@@ -165,7 +166,7 @@ async def generate_copilot_explanation(
     """
     if not CLAUDE_API_KEY or not issues:
         if score >= 85:
-            return f"Your domain {domain} is healthy. Inbox probability: {inbox_prob}%. Keep monitoring bounce and complaint rates daily."
+            return f"Your domain {domain} is healthy. Deliverability readiness: {readiness}%. Keep monitoring bounce and complaint rates daily."
         return f"Your domain {domain} has {len(issues)} issue(s) affecting deliverability. Fix the critical items first — they have the biggest inbox impact."
 
     try:
@@ -197,7 +198,7 @@ Be direct and specific. No fluff."""
         data = resp.json()
         return data["content"][0]["text"].strip()
     except:
-        return f"Domain health: {score}/100. Estimated inbox rate: {inbox_prob}%. {len(issues)} issue(s) need attention."
+        return f"Domain health: {score}/100. Deliverability readiness: {readiness}%. {len(issues)} issue(s) need attention."
 
 @router.post("/add")
 async def add_domain(
@@ -248,9 +249,9 @@ async def list_domains(request: Request, auth: dict = Depends(get_current_tenant
     db = request.app.state.db
     async with db.acquire() as conn:
         rows = await conn.fetch("""
-            SELECT id, domain, spf_valid, dkim_valid, dmarc_valid,
+            SELECT id, domain, spf_valid, dkim_valid, dmarc_valid, mx_valid,
                    warmup_day, warmup_status, daily_limit, sent_today,
-                   bounce_rate, complaint_rate, health_score, inbox_prob,
+                   bounce_rate, complaint_rate, health_score, deliverability_readiness,
                    blacklisted, last_checked
             FROM domains WHERE tenant_id=$1 ORDER BY added_at DESC
         """, auth["sub"])
@@ -289,7 +290,7 @@ async def deliverability_copilot(
         row = await conn.fetchrow("""
             SELECT domain, spf_valid, dkim_valid, dmarc_valid, mx_valid,
                    warmup_day, warmup_status, daily_limit,
-                   bounce_rate, complaint_rate, health_score, inbox_prob, blacklisted
+                   bounce_rate, complaint_rate, health_score, deliverability_readiness, blacklisted
             FROM domains WHERE id=$1 AND tenant_id=$2
         """, domain_id, auth["sub"])
     if not row:
@@ -304,7 +305,7 @@ async def deliverability_copilot(
         float(d["complaint_rate"]), d["warmup_day"]
     )
     explanation = await generate_copilot_explanation(
-        d["domain"], score, inbox_prob, issues
+        d["domain"], score, readiness, issues
     )
 
     # Warmup recommendation
@@ -316,7 +317,7 @@ async def deliverability_copilot(
     return {
         "domain":          d["domain"],
         "health_score":    score,
-        "inbox_probability": inbox_prob,
+        "deliverability_readiness": readiness,
         "grade":           "A" if score>=90 else "B" if score>=75 else "C" if score>=60 else "D",
         "explanation":     explanation,
         "dns_status":      dns_status,
@@ -340,19 +341,19 @@ async def _verify_and_score_domain(db, domain_id: int, domain: str):
     """Background: check DNS + score + update DB"""
     try:
         dns = await check_dns(domain)
-        score, inbox_prob, _ = calculate_health_score(dns, 0.0, 0.0, 0)
+        score, readiness, _ = calculate_health_score(dns, 0.0, 0.0, 0)
         async with db.acquire() as conn:
             await conn.execute("""
                 UPDATE domains
                 SET spf_valid=$1, dkim_valid=$2, dmarc_valid=$3,
-                    health_score=$4, inbox_prob=$5,
+                    health_score=$4, deliverability_readiness=$5,
                     warmup_status=CASE WHEN warmup_status='checking'
                         THEN CASE WHEN $1 AND $2 THEN 'ready' ELSE 'dns_incomplete' END
                         ELSE warmup_status END,
                     last_checked=NOW()
                 WHERE id=$6
             """, dns["spf"], dns["dkim"], dns["dmarc"],
-                score, inbox_prob, domain_id)
+                score, readiness, domain_id)
     except Exception as e:
         print(f"Domain verify error [{domain}]: {e}")
 
