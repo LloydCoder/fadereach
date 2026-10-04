@@ -186,7 +186,7 @@ async def generate_copilot_explanation(
                         "content": f"""You are FadeReach's Deliverability Copilot.
 Domain: {domain}
 Health score: {score}/100
-Inbox probability: {inbox_prob}%
+Deliverability readiness: {readiness}%
 Issues: {[i['message'] for i in issues[:3]]}
 
 Write 2-3 sentences explaining this in plain English for a non-technical founder.
@@ -300,7 +300,7 @@ async def deliverability_copilot(
     dns_status = {"spf": d["spf_valid"], "dkim": d["dkim_valid"],
                   "dmarc": d["dmarc_valid"], "mx": d.get("mx_valid", False)}
 
-    score, inbox_prob, issues = calculate_health_score(
+    score, readiness, issues = calculate_health_score(
         dns_status, float(d["bounce_rate"]),
         float(d["complaint_rate"]), d["warmup_day"]
     )
