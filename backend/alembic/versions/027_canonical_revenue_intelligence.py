@@ -11,7 +11,7 @@ canonical spine and links existing lead/campaign/reply records into it.
 
 from alembic import op
 
-revision = "027_canonical_revenue_intelligence"
+revision = "027_canonical_revenue_model"
 down_revision = "026_compliance_governance"
 branch_labels = None
 depends_on = None
