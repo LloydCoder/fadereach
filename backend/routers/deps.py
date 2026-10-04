@@ -1,6 +1,7 @@
 """Shared authentication and tenant authorization dependencies."""
 import os
 import jwt
+from tenant_context import tenant_id_context
 from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
@@ -38,9 +39,11 @@ async def get_current_tenant(
     if tenant["status"] == "trial_expired":
         raise HTTPException(403, "Trial expired — upgrade to continue")
 
+    tenant_id_context.set(str(tenant["id"]))
+
     # Plan/status are authoritative database state. JWT claims are session
     # identity only and are deliberately not trusted for authorization.
-    return dict(tenant)
+    return {**dict(tenant), "sub": str(tenant["id"])}
 
 async def require_admin(
     credentials: HTTPAuthorizationCredentials = Depends(security),
