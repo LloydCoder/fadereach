@@ -7,6 +7,8 @@ from .deps import get_current_tenant
 import httpx, os
 from datetime import datetime
 import socket
+import ipaddress
+import re
 
 router = APIRouter()
 
@@ -30,6 +32,28 @@ class DomainAddReq(BaseModel):
     domain: str
     dkim_selector: str = "mail"
     sending_ip: str | None = None
+
+
+def normalize_domain(value: str) -> str:
+    value = value.strip().rstrip(".").lower()
+    if len(value) > 253 or not value or "@" in value or "/" in value:
+        raise HTTPException(400, "Invalid sending domain")
+    try:
+        ipaddress.ip_address(value)
+        raise HTTPException(400, "Sending domain must be a hostname, not an IP address")
+    except ValueError:
+        pass
+    try:
+        value = value.encode("idna").decode("ascii")
+    except UnicodeError as exc:
+        raise HTTPException(400, "Invalid internationalized domain name") from exc
+    labels = value.split(".")
+    if len(labels) < 2 or any(
+        not label or len(label) > 63 or not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?", label)
+        for label in labels
+    ):
+        raise HTTPException(400, "Invalid sending domain")
+    return value
 
 async def check_dns(domain: str, dkim_selector: str = "mail", sending_ip: str | None = None) -> dict:
     """Check observable sender controls without predicting inbox placement."""
@@ -222,6 +246,9 @@ async def add_domain(
     tenant_id = auth["sub"]
     plan      = auth.get("plan", "trial")
     limit     = PLAN_LIMITS.get(plan, 1)
+    domain = normalize_domain(req.domain)
+    if len(req.dkim_selector) > 63 or not re.fullmatch(r"[A-Za-z0-9._-]+", req.dkim_selector):
+        raise HTTPException(400, "Invalid DKIM selector")
 
     async with db.acquire() as conn:
         count = await conn.fetchval(
@@ -235,7 +262,7 @@ async def add_domain(
         # Check domain not already added
         existing = await conn.fetchrow(
             "SELECT id FROM domains WHERE tenant_id=$1 AND domain=$2",
-            tenant_id, req.domain.lower().strip()
+            tenant_id, domain
         )
         if existing:
             raise HTTPException(409, "Domain already added to your workspace")
@@ -243,16 +270,16 @@ async def add_domain(
         domain_id = await conn.fetchval("""
             INSERT INTO domains (tenant_id, domain, warmup_status)
             VALUES ($1, $2, 'checking') RETURNING id
-        """, tenant_id, req.domain.lower().strip())
+        """, tenant_id, domain)
 
-    background_tasks.add_task(_verify_and_score_domain, db, domain_id, req.domain.lower().strip(), req.dkim_selector, req.sending_ip)
+    background_tasks.add_task(_verify_and_score_domain, db, domain_id, domain, req.dkim_selector, req.sending_ip)
 
     return {
         "domain_id":  domain_id,
-        "domain":     req.domain,
+        "domain":     domain,
         "status":     "checking",
         "message":    "Domain added. Checking DNS records...",
-        "dns_records_needed": _get_dns_guide(req.domain)
+        "dns_records_needed": _get_dns_guide(domain)
     }
 
 @router.post("/{domain_id}/pause")
