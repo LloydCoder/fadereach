@@ -27,6 +27,7 @@ services:
       N8N_WEBHOOK_URL: http://n8n:5678/webhook
       FADEREACH_API_URL: http://api:8000
       SIGNAL_INGEST_SECRET: ${SIGNAL_INGEST_SECRET}
+      METRICS_TOKEN: ${METRICS_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
