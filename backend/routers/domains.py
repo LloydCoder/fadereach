@@ -88,7 +88,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "severity": "critical",
             "type": "spf_missing",
             "message": "SPF record missing",
-            "fix": f"Add TXT record: v=spf1 ip4:YOUR_VPS_IP ~all",
+            "fix": f"Add TXT record: v=spf1 ip4:YOUR_SENDING_IP ~all",
             "impact": "Emails may be rejected by recipient servers"
         })
     if not dns.get("dkim"):
@@ -369,7 +369,6 @@ async def _verify_and_score_domain(db, domain_id: int, domain: str, dkim_selecto
                 WHERE id=$9
             """, dns["spf"], dns["dkim"], dns["dmarc"], dns["mx"],
                 dns["dmarc_policy"], dns["ptr"], score, readiness, domain_id)
-                score, readiness, domain_id)
     except Exception as e:
         print(f"Domain verify error [{domain}]: {e}")
 
