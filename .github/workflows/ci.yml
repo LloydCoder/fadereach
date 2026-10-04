@@ -83,7 +83,8 @@ jobs:
           LISTMONK_ADMIN_PASSWORD=ci-password
           N8N_ENCRYPTION_KEY=ci-key
           EOF
-      - run: docker compose --env-file .env.ci config --quiet
+      - run: |
+          docker compose --env-file .env.ci config --quiet
           docker compose --env-file .env.ci build api frontend
 
   shell:
