@@ -60,7 +60,7 @@ A phase may be promoted only when all of the following are true:
 
 F16 PR #45 was merged into `main` on 2026-10-04. The PR head commit passed the FadeReach CI workflow before merge.
 
-The final promoted FadeReach commit is the authoritative repository gate. The promoted F17 ledger-reconciliation commit is CI-green across backend, migration/RLS, frontend, Compose, shell, and security/dependency checks. F16's live Agent Platform endpoint/credential validation remains an environment-specific production acceptance gate and is not represented as repository evidence.
+The final promoted FadeReach commit is the authoritative repository gate. The promoted F17 ledger-reconciliation commit is CI-green across backend, migration/RLS, frontend, Compose, shell, security/dependency, and supply-chain SBOM checks. F16's live Agent Platform endpoint/credential validation remains an environment-specific production acceptance gate and is not represented as repository evidence.
 
 ## Important distinction
 
@@ -74,3 +74,8 @@ A repository may be technically complete while still requiring live provider, in
 FadeReach's autonomy boundary is intentionally fail-closed. The companion Tinlance Agent Platform repository documents M29 as complete and defines governed execution, approval, authorization, budgets, evidence, audit and remote authority attenuation as Platform responsibilities. FadeReach therefore does not duplicate those controls.
 
 The FadeReach repository can validate the contract and fail-closed behavior in CI. A live Agent Platform URL, credentials, network path and production deployment are environment-specific and cannot be manufactured by repository code. Those items remain part of production acceptance evidence.
+
+
+## Final reconciliation evidence
+
+Final main commit: `f4929c46baf361f7f1f36dc87881ea0b4e46939b`. The required repository workflows completed successfully on that promoted commit. The final forensic audit additionally verified that the documentation index resolves to existing files and that no open PRs or issues remain.

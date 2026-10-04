@@ -240,8 +240,10 @@ The CI workflow validates:
 - frontend production build
 - Docker Compose configuration
 - shell syntax
+- CycloneDX Python SBOM generation and structural validation
+- dependency-update governance via Dependabot
 
-The CI workflow runs the backend smoke suite with pytest, verifies the Alembic migration chain, exercises tenant RLS isolation against PostgreSQL, builds the frontend and validates Docker Compose and shell syntax.
+The CI workflow runs the backend smoke suite with pytest, verifies the Alembic migration chain, exercises tenant RLS isolation against PostgreSQL, builds the frontend, validates Docker Compose and shell syntax, and generates a retained CycloneDX Python SBOM. Dependabot is configured for Python, npm, Docker and GitHub Actions dependency updates.
 
 For current email-sender requirements, consult Google's [Email sender guidelines](https://support.google.com/mail/answer/81126) before changing deliverability policy.
 

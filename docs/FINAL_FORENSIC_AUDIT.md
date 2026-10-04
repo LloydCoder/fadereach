@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the F17 audit artifact for the FadeReach repository. It defines the final repository-level inspection scope and records the evidence required before the project can be called enterprise-ready.
+This is the F17 audit artifact for the FadeReach repository. It records the final repository-level forensic inspection and the evidence boundary between repository completeness and external production assurance.
 
 ## Audit scope
 
@@ -61,7 +61,15 @@ The repository MUST preserve these invariants:
 
 ## Documentation completeness
 
-The documentation index is the canonical inventory. It includes architecture, data model, API, security, threat model, secrets, audit logging, configuration, deployment, operations, disaster recovery, incident response, observability, testing, deliverability, compliance, data governance, intelligence, campaign lifecycle, autonomy governance, enterprise, agency, releases, production readiness, access control, outbound policy, queue execution, AI governance/evaluation, privacy engineering, reliability, risk register, final audit checklist, CI verification, phase gates, and integration references.
+The documentation index is the canonical inventory. It includes architecture, data model, API, security, threat model, secrets, audit logging, configuration, deployment, operations, disaster recovery, incident response, observability, testing, deliverability, compliance, data governance, intelligence, campaign lifecycle, autonomy governance, enterprise, agency, releases, production readiness, access control, outbound policy, queue execution, AI governance/evaluation, privacy engineering, reliability, risk register, final audit checklist, CI verification, phase gates, supply-chain evidence, and integration references.
+
+## Current forensic findings
+
+The final repository pass verified the tracked-file inventory, documentation links, phase ledger, workflow set, migration/RLS tests, tenant isolation checks, frontend build, Compose validation, security/dependency checks, and supply-chain SBOM generation. No open GitHub issues or pull requests remain after the final reconciliation.
+
+The audit also corrected a production topology defect: durable outbound and retention workers are now isolated in a dedicated worker service, while the API no longer starts background workers or mutates schema at startup. Production migration execution is explicit and occurs before service startup.
+
+The audit found no unresolved repository-critical/high defect after the final CI run. Remaining enterprise acceptance items are external evidence: live provider credentials, real deployment, backup/restore exercise, DNS/TLS/deliverability verification, live Agent Platform endpoint validation, independent security assessment, customer workload evidence, and complete frontend/container SBOM/provenance coverage.
 
 ## Final acceptance
 
@@ -80,3 +88,10 @@ F17 is accepted only when:
 ## Audit rule
 
 No statement in this document overrides actual runtime, CI, provider, infrastructure, security or customer evidence. When evidence is absent, the state MUST remain UNKNOWN/PENDING rather than being promoted by assumption.
+
+
+## Promoted evidence
+
+Final reconciled main commit: `f4929c46baf361f7f1f36dc87881ea0b4e46939b`.
+
+Required FadeReach workflows on that commit completed successfully: backend compile/migration/RLS/tests, frontend build, Compose validation, shell syntax, security static/dependency audit, and supply-chain SBOM evidence. The repository also has successful Dependabot configuration validation; transient Dependabot updater failures caused by the previous incorrect Docker directory were remediated and the corrected configuration was merged and revalidated.
