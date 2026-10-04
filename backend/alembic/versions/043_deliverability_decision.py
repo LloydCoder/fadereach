@@ -1,0 +1,5 @@
+"""Phase 17 deliverability execution decisions."""
+from alembic import op
+revision="043_deliverability_decision"; down_revision="042_durable_execution"; branch_labels=None; depends_on=None
+def upgrade(): op.execute("""CREATE TABLE IF NOT EXISTS execution_decisions (id BIGSERIAL PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,job_id UUID,allowed BOOLEAN NOT NULL,decision_code TEXT NOT NULL,policy_version TEXT NOT NULL,risk_score NUMERIC(6,5) NOT NULL,evidence_refs JSONB NOT NULL DEFAULT '[]'::jsonb,checked_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); ALTER TABLE execution_decisions ENABLE ROW LEVEL SECURITY; ALTER TABLE execution_decisions FORCE ROW LEVEL SECURITY; CREATE POLICY execution_decisions_tenant_isolation ON execution_decisions USING(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));""")
+def downgrade(): op.execute("DROP TABLE IF EXISTS execution_decisions CASCADE")
