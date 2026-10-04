@@ -356,8 +356,31 @@ async def pause_campaign(
         if not row:
             raise HTTPException(404, "Campaign not found")
         await conn.execute(
-            "UPDATE campaigns SET status='paused', updated_at=NOW() WHERE id=$1",
-            campaign_id
+            "UPDATE campaigns SET status='paused', updated_at=NOW() WHERE id=$1 AND tenant_id=$2",
+            campaign_id, auth["sub"]
+        )
+        await conn.execute(
+            """
+            UPDATE campaign_executions
+            SET cancel_requested=TRUE, updated_at=NOW()
+            WHERE campaign_id=$1
+              AND tenant_id=$2
+              AND status IN ('queued','running')
+            """,
+            campaign_id, auth["sub"],
+        )
+        await conn.execute(
+            """
+            UPDATE execution_jobs
+            SET status='cancelled', completed_at=NOW(), updated_at=NOW()
+            WHERE execution_id IN (
+                SELECT id FROM campaign_executions
+                WHERE campaign_id=$1 AND tenant_id=$2 AND status='queued'
+            )
+              AND tenant_id=$2
+              AND status='queued'
+            """,
+            campaign_id, auth["sub"],
         )
     return {"campaign_id": campaign_id, "status": "paused"}
 
