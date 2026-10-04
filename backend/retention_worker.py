@@ -8,10 +8,11 @@ from tenant_context import tenant_id_context
 POLL_SECONDS = int(os.getenv("RETENTION_WORKER_POLL_SECONDS", str(24 * 3600)))
 
 
-async def run_retention_worker(db) -> None:
+async def run_retention_worker(db, scan_db=None) -> None:
+    scan_db = scan_db or db
     while True:
         try:
-            await enforce_retention(db)
+            await enforce_retention(db, scan_db)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
@@ -19,8 +20,9 @@ async def run_retention_worker(db) -> None:
         await asyncio.sleep(POLL_SECONDS)
 
 
-async def enforce_retention(db) -> None:
-    async with db.acquire() as conn:
+async def enforce_retention(db, scan_db=None) -> None:
+    scan_db = scan_db or db
+    async with scan_db.acquire() as conn:
         tenants = await conn.fetch(
             "SELECT tenant_id, default_retention_days FROM tenant_data_policies"
         )
