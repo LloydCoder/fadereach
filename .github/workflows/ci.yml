@@ -152,3 +152,34 @@ jobs:
         run: pip install bandit==1.9.4 && bandit -r . -x ./tests -lll
       - name: Dependency vulnerability audit
         run: pip install pip-audit==2.10.1 && pip-audit -r requirements.txt
+
+
+  supply_chain:
+    name: Supply-chain SBOM evidence
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - name: Generate Python SBOM
+        run: |
+          python -m pip install --disable-pip-version-check cyclonedx-bom==7.5.0
+          cyclonedx-py requirements -i backend/requirements.txt -o backend-sbom.json --output-format json
+      - name: Validate SBOM
+        run: |
+          python - <<'PY'
+          import json
+          with open("backend-sbom.json", encoding="utf-8") as handle:
+              bom = json.load(handle)
+          assert bom["bomFormat"] == "CycloneDX"
+          assert bom["specVersion"]
+          assert isinstance(bom.get("components"), list)
+          PY
+      - name: Upload SBOM evidence
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: fadereach-python-sbom
+          path: backend-sbom.json
+          if-no-files-found: error
+          retention-days: 90
