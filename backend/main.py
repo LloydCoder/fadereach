@@ -141,3 +141,29 @@ app.include_router(opportunity_feed.router, prefix="/api/opportunities", tags=["
 app.include_router(learning.router,         prefix="/api/learning",      tags=["Learning Engine"])
 app.include_router(graphify.router,         prefix="/api/graphify",      tags=["Graphify"])
 app.include_router(testing_router.router,   prefix="/api/testing",       tags=["A/B Testing"])
+
+
+# ── Complete router registry ─────────────────────────────
+# Keep the full implemented API surface reachable. Routers are mounted explicitly
+# here rather than relying on implicit discovery.
+from routers import (
+    auth, campaigns, leads, domains, inbox, analytics, admin, tenants, rbac,
+    webhooks, managed, verticals, whitelabel, ecosystem, public_api, nowpayments
+)
+
+app.include_router(auth.router, prefix="/api/auth", tags=["Auth"])
+app.include_router(campaigns.router, prefix="/api/campaigns", tags=["Campaigns"])
+app.include_router(leads.router, prefix="/api/leads", tags=["Leads"])
+app.include_router(domains.router, prefix="/api/domains", tags=["Domains"])
+app.include_router(inbox.router, prefix="/api/inbox", tags=["Inbox"])
+app.include_router(analytics.router, prefix="/api/analytics", tags=["Analytics"])
+app.include_router(admin.router, prefix="/api/admin", tags=["Admin"])
+app.include_router(tenants.router, prefix="/api/tenants", tags=["Tenants"])
+app.include_router(rbac.router, prefix="/api/rbac", tags=["RBAC"])
+app.include_router(webhooks.router, prefix="/api/webhooks", tags=["Webhooks"])
+app.include_router(managed.router, prefix="/api/managed", tags=["Managed"])
+app.include_router(verticals.router, prefix="/api/verticals", tags=["Verticals"])
+app.include_router(whitelabel.router, prefix="/api/whitelabel", tags=["White Label"])
+app.include_router(ecosystem.router, prefix="/api/ecosystem", tags=["Ecosystem"])
+app.include_router(public_api.router, prefix="/api/public", tags=["Public API"])
+app.include_router(nowpayments.router, prefix="/api/payments", tags=["Payments"])

@@ -1,0 +1,1 @@
+FadeReach database migrations. Run `alembic upgrade head` from the repository root after setting DATABASE_URL.
