@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from .deps import get_current_tenant
 from tenant_context import tenant_id_context
 from signal_convergence import persist_signal_and_convergence
+from temporal_intelligence import persist_trajectory
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -231,6 +232,9 @@ async def ingest_signal(
             },
             _source_trust_tier(source),
         )
+
+        if organization_id:
+            await persist_trajectory(conn, tenant_id, organization_id, normalized_type)
 
         if account_id:
             await conn.execute(
