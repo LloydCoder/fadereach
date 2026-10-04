@@ -4,12 +4,12 @@ from main import app
 
 
 def test_health_route_is_registered():
-    routes = {route.path for route in app.routes}
+    routes = {route.path for route in app.routes if hasattr(route, "path")}
     assert "/api/health" in routes
 
 
 def test_core_router_surface_is_registered():
-    routes = {route.path for route in app.routes}
+    routes = {route.path for route in app.routes if hasattr(route, "path")}
     expected_prefixes = {
         "/api/auth",
         "/api/campaigns",
