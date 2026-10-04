@@ -1,6 +1,6 @@
 # FadeReach Backend
 # Python 3.12
-fastapi==0.136.3
+fastapi==0.142.2
 uvicorn[standard]==0.30.0
 pydantic[email]==2.11.5
 asyncpg==0.29.0
