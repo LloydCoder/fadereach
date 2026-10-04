@@ -78,4 +78,9 @@ The FadeReach repository can validate the contract and fail-closed behavior in C
 
 ## Final reconciliation evidence
 
-Final main commit: `f4929c46baf361f7f1f36dc87881ea0b4e46939b`. The required repository workflows completed successfully on that promoted commit. The final forensic audit additionally verified that the documentation index resolves to existing files and that no open PRs or issues remain.
+Final main commit: `a64b2770078346ebe0a98d823fd4f7bfa7b41e58`. The required repository workflows completed successfully on that promoted commit. The final forensic audit additionally verified that the documentation index resolves to existing files and that no open PRs or issues remain.
+
+
+## Final current-main forensic pass
+
+The repository-wide pass on `a64b2770078346ebe0a98d823fd4f7bfa7b41e58` verified 186 tracked files, 63 documentation files, zero unresolved documentation-index targets, zero open issues, zero open pull requests, and no repository search hits for the audited hardcoded endpoint, bare `except:`, `verify=False`, wildcard CORS pattern, or TODO/FIXME/HACK markers. Required CI workflows were green on the promoted commit.
