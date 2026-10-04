@@ -64,6 +64,8 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT relrowsecurity FROM pg_class WHERE relname = 'campaigns';" | grep -q t
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT rolbypassrls FROM pg_roles WHERE rolname = 'fadereach_worker';" | grep -q t
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT has_table_privilege('fadereach_worker','execution_jobs','SELECT,UPDATE');" | grep -q t
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT has_table_privilege('fadereach_worker','tenant_data_policies','SELECT');" | grep -q t
+          PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -c "SELECT has_table_privilege('fadereach_worker','leads','DELETE');" | grep -q t
       - name: Verify tenant RLS isolation
         run: |
           PGPASSWORD=postgres psql -h localhost -U postgres -d fadereach_test -v ON_ERROR_STOP=1 -c "INSERT INTO tenants (id,email,name,password_hash) VALUES ('ci-tenant-a','a@example.test','Tenant A','test'), ('ci-tenant-b','b@example.test','Tenant B','test') ON CONFLICT (id) DO NOTHING;"

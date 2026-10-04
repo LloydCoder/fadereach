@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     await _init_db(app.state.db)
     worker_task = asyncio.create_task(run_outbound_worker(app.state.db, app.state.worker_queue_db))
-    retention_task = asyncio.create_task(run_retention_worker(app.state.db))
+    retention_task = asyncio.create_task(run_retention_worker(app.state.db, app.state.worker_queue_db))
     app.state.outbound_worker = worker_task
     app.state.retention_worker = retention_task
     print(f"✓ FadeReach API [{ENVIRONMENT}] → {APP_URL}")
