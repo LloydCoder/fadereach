@@ -30,7 +30,7 @@ def test_every_tenant_table_has_rls_and_policy():
     with psycopg2.connect(os.environ["MIGRATION_DATABASE_URL"]) as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT c.table_name, cls.relrowsecurity,
+                SELECT c.table_name, cls.relrowsecurity, cls.relforcerowsecurity,
                        EXISTS (
                            SELECT 1 FROM pg_policies p
                            WHERE p.schemaname = 'public'
@@ -42,13 +42,14 @@ def test_every_tenant_table_has_rls_and_policy():
                 JOIN pg_namespace n ON n.oid = cls.relnamespace
                                   AND n.nspname = 'public'
                 WHERE c.table_schema = 'public' AND c.column_name = 'tenant_id'
-                GROUP BY c.table_name, cls.relrowsecurity
+                GROUP BY c.table_name, cls.relrowsecurity, cls.relforcerowsecurity
             """)
-            found = {name: (rls, policy) for name, rls, policy in cur.fetchall()}
+            found = {name: (rls, force_rls, policy) for name, rls, force_rls, policy in cur.fetchall()}
 
     assert not TENANT_TABLES - found.keys(), sorted(TENANT_TABLES - found.keys())
     assert not found.keys() - TENANT_TABLES, sorted(found.keys() - TENANT_TABLES)
     assert not [name for name in TENANT_TABLES if not all(found[name])]
+    assert not [name for name in TENANT_TABLES if not found[name][1]]
 
 
 def test_runtime_role_cannot_cross_tenants():
@@ -85,3 +86,18 @@ def test_runtime_role_cannot_cross_tenants():
                     INSERT INTO accounts (tenant_id,domain,name)
                     VALUES ('f2-b','blocked.example.test','must fail')
                 """)
+
+
+def test_runtime_role_sees_no_tenant_without_context():
+    runtime_url = os.environ["DATABASE_URL"]
+    with psycopg2.connect(runtime_url) as conn:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM accounts")
+            assert cur.fetchone()[0] == 0
+            with pytest.raises(InsufficientPrivilege):
+                cur.execute(
+                    """
+                    INSERT INTO accounts (tenant_id,domain,name)
+                    VALUES ('f2-a','missing-context.example.test','must fail')
+                    """
+                )
