@@ -74,6 +74,7 @@ jobs:
           DATABASE_URL: postgresql://fadereach_runtime:runtime-password@localhost:5432/fadereach_test
           MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
           REDIS_URL: redis://localhost:6379/0
+          MIGRATION_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
         run: |
           python -c "from main import app; print('routes', len(app.routes))"
           PYTHONPATH=. pytest -q tests
