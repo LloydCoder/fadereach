@@ -11,6 +11,37 @@ from tenant_context import tenant_id_context
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
 
+SIGNAL_NORMALIZATION = {
+    "hiring": ("hiring", "workforce", 45),
+    "hiring_spike": ("hiring_spike", "workforce", 45),
+    "funding": ("funding", "finance", 90),
+    "leadership": ("leadership_change", "leadership", 120),
+    "leadership_change": ("leadership_change", "leadership", 120),
+    "expansion": ("expansion", "expansion", 60),
+    "migration": ("migration", "technology", 60),
+    "tech_stack_change": ("technology_change", "technology", 45),
+    "ai_adoption": ("ai_adoption", "ai", 60),
+    "security_incident": ("security_incident", "security", 30),
+    "security_gap": ("security_gap", "security", 30),
+    "infrastructure": ("infrastructure_change", "infrastructure", 45),
+    "product_launch": ("product_launch", "product", 45),
+    "pricing_change": ("pricing_change", "commercial", 30),
+    "partnership": ("partnership", "commercial", 60),
+    "procurement": ("procurement", "procurement", 60),
+    "regulatory": ("regulatory_change", "compliance", 120),
+    "compliance": ("compliance_change", "compliance", 120),
+}
+
+def _normalize_signal(signal_type: str) -> tuple[str, str, int]:
+    value = signal_type.strip().lower().replace("-", "_").replace(" ", "_")
+    for key, result in SIGNAL_NORMALIZATION.items():
+        if key in value:
+            return result
+    return (value[:120] or "unknown", "other", 30)
+
+def _source_trust_tier(source: str) -> str:
+    return {"tads": "T1", "sdea": "T1", "reconos": "T2"}.get(source.lower(), "T2")
+
 DEMAND_MAP = {
     "hiring": ("capacity_or_delivery_need", "Engineering hiring can indicate active delivery or platform investment."),
     "funding": ("growth_execution", "Funding can create urgency to convert capital into execution and pipeline."),
@@ -64,6 +95,9 @@ async def ingest_signal(
     score = max(0, min(100, int(payload.get("score", 0))))
     evidence = payload.get("evidence", [])
     observed_at = payload.get("observed_at")
+    normalized_type, signal_category, freshness_days = _normalize_signal(signal_type)
+    source_url = payload.get("source_url") or payload.get("url")
+    raw_payload_hash = hashlib.sha256(raw).hexdigest()
 
     if not all([tenant_id, source, signal_type, external_id]):
         raise HTTPException(400, "tenant_id, source, signal_type and external_id are required")
@@ -81,6 +115,22 @@ async def ingest_signal(
         tenant = await conn.fetchval("SELECT id FROM tenants WHERE id=$1", tenant_id)
         if not tenant:
             raise HTTPException(404, "Tenant not found")
+        await conn.execute(
+            """INSERT INTO signal_sources
+               (tenant_id, source_key, source_kind, trust_tier, schema_version, last_seen_at)
+               VALUES ($1,$2,'internal',$3,$4,NOW())
+               ON CONFLICT (tenant_id, source_key)
+               DO UPDATE SET last_seen_at=NOW(), updated_at=NOW()""",
+            tenant_id, source, _source_trust_tier(source),
+            str(payload.get("schema_version") or "1"),
+        )
+        run_id = await conn.fetchval(
+            """INSERT INTO signal_ingestion_runs
+               (tenant_id, source_key, received_count, metadata)
+               VALUES ($1,$2,1,$3::jsonb)
+               RETURNING id""",
+            tenant_id, source, json.dumps({"normalization_version": "1"}),
+        )
         claimed = await conn.fetchval(
             """
             INSERT INTO webhook_events (provider,event_id,payload)
@@ -91,6 +141,10 @@ async def ingest_signal(
             external_id, json.dumps(payload),
         )
         if not claimed:
+            await conn.execute(
+                "UPDATE signal_ingestion_runs SET duplicate_count=1, status='completed', completed_at=NOW() WHERE id=$1",
+                run_id,
+            )
             return {"status": "duplicate", "external_id": external_id}
 
         account_id = None
@@ -123,29 +177,39 @@ async def ingest_signal(
 
         row = await conn.fetchrow(
             """INSERT INTO intelligence_signals
-               (tenant_id, source, signal_type, company_name, domain, observed_at, score, evidence, external_id, source_url, confidence)
-               VALUES ($1,$2,$3,$4,$5,COALESCE($6,NOW()),$7,$8::jsonb,$9,$10,$11)
+               (tenant_id, source, signal_type, company_name, domain, observed_at, score, evidence, external_id, source_url, confidence,
+                normalized_type, signal_category, source_observed_at, freshness_expires_at, raw_payload_hash, normalization_version, normalization_status)
+               VALUES ($1,$2,$3,$4,$5,COALESCE($6,NOW()),$7,$8::jsonb,$9,$10,$11,
+                       $12,$13,COALESCE($6,NOW()),COALESCE($6,NOW()) + ($14 || ' days')::interval,$15,'1','normalized')
                ON CONFLICT (tenant_id, source, external_id) DO UPDATE
                SET signal_type=EXCLUDED.signal_type, company_name=EXCLUDED.company_name,
                    domain=EXCLUDED.domain, observed_at=EXCLUDED.observed_at,
-                   score=EXCLUDED.score, evidence=EXCLUDED.evidence
+                   score=EXCLUDED.score, evidence=EXCLUDED.evidence,
+                   normalized_type=EXCLUDED.normalized_type, signal_category=EXCLUDED.signal_category,
+                   source_url=EXCLUDED.source_url, source_observed_at=EXCLUDED.source_observed_at,
+                   freshness_expires_at=EXCLUDED.freshness_expires_at,
+                   raw_payload_hash=EXCLUDED.raw_payload_hash,
+                   normalization_status='normalized'
                RETURNING id""",
             tenant_id, source, signal_type, company_name, domain, observed_at,
             score, json.dumps(evidence), external_id,
-            payload.get("source_url") or payload.get("url"),
+            source_url,
             min(0.95, 0.50 + score / 200),
+            normalized_type, signal_category, freshness_days, raw_payload_hash,
         )
 
         if account_id:
             await conn.execute(
                 """INSERT INTO account_signals
-                   (tenant_id, account_id, source, signal_type, score, observed_at, evidence, external_id)
-                   VALUES ($1,$2,$3,$4,$5,COALESCE($6,NOW()),$7::jsonb,$8)
+                   (tenant_id, account_id, source, signal_type, score, observed_at, evidence, external_id,
+                    normalized_type, signal_category, source_url)
+                   VALUES ($1,$2,$3,$4,$5,COALESCE($6,NOW()),$7::jsonb,$8,$9,$10,$11)
                    ON CONFLICT (tenant_id, source, external_id)
                    DO UPDATE SET score=EXCLUDED.score, observed_at=EXCLUDED.observed_at,
-                                 evidence=EXCLUDED.evidence""",
+                                 evidence=EXCLUDED.evidence, normalized_type=EXCLUDED.normalized_type,
+                                 signal_category=EXCLUDED.signal_category, source_url=EXCLUDED.source_url""",
                 tenant_id, account_id, source, signal_type, score, observed_at,
-                json.dumps(evidence), external_id,
+                json.dumps(evidence), external_id, normalized_type, signal_category, source_url,
             )
 
         demand_key = next((k for k in DEMAND_MAP if k in signal_type.lower()), None)
@@ -166,6 +230,10 @@ async def ingest_signal(
         else:
             hypothesis = None
 
+    await conn.execute(
+        "UPDATE signal_ingestion_runs SET accepted_count=1, status='completed', completed_at=NOW() WHERE id=$1",
+        run_id,
+    )
     tenant_id_context.reset(tenant_ctx)
     return {
         "signal_id": row["id"],
