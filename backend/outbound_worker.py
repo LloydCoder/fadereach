@@ -64,10 +64,7 @@ async def _claim_job(db):
             )
             UPDATE execution_jobs j
             SET status='running',
-                attempts = CASE
-                    WHEN j.status='running' THEN j.attempts
-                    ELSE j.attempts + 1
-                END,
+                attempts = j.attempts + 1,
                 locked_at=NOW(),
                 locked_by=$2,
                 updated_at=NOW()
@@ -114,7 +111,8 @@ async def _run_job(db, job: dict) -> None:
             await conn.execute(
                 """
                 UPDATE campaign_executions
-                SET status=$2, error_count=recipient_count,
+                SET status=$2,
+                    error_count=CASE WHEN $2='failed' THEN recipient_count ELSE error_count END,
                     error_message=$3,
                     completed_at=CASE WHEN $2='failed' THEN NOW() ELSE completed_at END
                 WHERE id=$1
