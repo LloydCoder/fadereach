@@ -71,7 +71,8 @@ Tinlance Agent Platform and Tinlance Agent OS are separate governed execution/wo
 
 - **FastAPI** — application/control API.
 - **PostgreSQL** — authoritative application state.
-- **Alembic** — schema migration authority.
+- **Alembic** — schema migration authority; migrations must not run with the application runtime role.
+- **Runtime DB role** — application data access only; it must not own schema objects or execute DDL.
 - **Redis/Valkey** — transient/cache/queue state where used.
 - **Listmonk** — email execution adapter, not the product brain.
 - **n8n** — external integration/automation adapter, not the authoritative intelligence or runtime.
@@ -110,18 +111,23 @@ The repository is being hardened in serial production phases. Green CI is a nece
 Current sequence:
 
 1. **F0 — Forensic reconciliation**
-2. **F1 — Production foundation**
+2. **F1 — Deterministic production foundation**
 3. **F2 — Database and tenancy**
 4. **F3 — Security hardening**
-5. **F4 — Outbound execution**
+5. **F4 — Durable outbound execution**
 6. **F5 — Deliverability control plane**
-7. **F6 — Intelligence engine**
-8. **F7 — TADS/SDEA integration**
-9. **F8 — Outbound Intelligence Graph**
-10. **F9 — Campaign Autopilot**
-11. **F10 — Learning and attribution**
-12. **F11 — Agency and enterprise**
-13. **F12 — Autonomous governed GTM**
+7. **F6 — Compliance and data governance**
+8. **F7 — Intelligence engine**
+9. **F8 — TADS/SDEA integration**
+10. **F9 — Outbound Intelligence Graph**
+11. **F10 — Campaign Autopilot**
+12. **F11 — Learning and revenue attribution**
+13. **F12 — Agency platform**
+14. **F13 — Enterprise platform**
+15. **F14 — Reliability, observability and disaster recovery**
+16. **F15 — Production operations**
+17. **F16 — Governed autonomous GTM**
+18. **F17 — Final forensic enterprise audit**
 
 A phase is not considered complete merely because code exists. Its implementation, documentation, tests, deployment assumptions and CI/workflow evidence must reconcile.
 
@@ -188,7 +194,7 @@ Campaign policy must account for the recipient jurisdiction, subscriber/customer
 
 ## Production deployment
 
-The repository contains deployment automation, but production deployment is intentionally gated. Never treat a GitHub commit as evidence that the running server has been updated.
+The repository contains deployment automation, but production deployment is intentionally gated. Never treat a GitHub commit as evidence that the running server has been updated. The canonical application runtime uses the containerized PostgreSQL and Redis services defined in docker-compose.yml; the API uses a least-privilege runtime database role, while Alembic migrations use a separate migration credential.
 
 Before production promotion:
 
