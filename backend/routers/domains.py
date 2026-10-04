@@ -282,7 +282,7 @@ async def resume_domain(domain_id: int, request: Request, auth: dict = Depends(g
         if not all([row["spf_valid"], row["dkim_valid"], row["dmarc_valid"], row["mx_valid"]]):
             raise HTTPException(409, "Sender authentication and MX checks must pass before resuming")
         await conn.execute(
-            "UPDATE domains SET sending_paused=FALSE, pause_reason=NULL, updated_at=NOW() WHERE id=$1 AND tenant_id=$2",
+            "UPDATE domains SET sending_paused=FALSE, pause_reason=NULL, last_deliverability_check=NOW() WHERE id=$1 AND tenant_id=$2",
             domain_id, auth["sub"],
         )
     return {"domain_id": domain_id, "sending_paused": False}
