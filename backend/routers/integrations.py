@@ -237,7 +237,7 @@ async def ingest_signal(
             await persist_trajectory(conn, tenant_id, organization_id, normalized_type)
 
         if account_id:
-            await conn.execute(
+            account_signal_id = await conn.fetchval(
                 """INSERT INTO account_signals
                    (tenant_id, account_id, source, signal_type, score, observed_at, evidence, external_id,
                     normalized_type, signal_category, source_url)
@@ -245,9 +245,20 @@ async def ingest_signal(
                    ON CONFLICT (tenant_id, source, external_id)
                    DO UPDATE SET score=EXCLUDED.score, observed_at=EXCLUDED.observed_at,
                                  evidence=EXCLUDED.evidence, normalized_type=EXCLUDED.normalized_type,
-                                 signal_category=EXCLUDED.signal_category, source_url=EXCLUDED.source_url""",
+                                 signal_category=EXCLUDED.signal_category, source_url=EXCLUDED.source_url
+                   RETURNING id""",
                 tenant_id, account_id, source, signal_type, score, observed_at,
                 json.dumps(evidence), external_id, normalized_type, signal_category, source_url,
+            )
+            await conn.execute(
+                """INSERT INTO account_graph_edges
+                   (tenant_id, account_id, source_type, source_id, target_type, target_id, relation, confidence, metadata)
+                   VALUES ($1,$2,'account',$2,'signal',$3,'observed_signal',$4,$5::jsonb)
+                   ON CONFLICT (tenant_id, source_type, source_id, relation, target_type, target_id)
+                   DO UPDATE SET confidence=EXCLUDED.confidence, metadata=EXCLUDED.metadata, updated_at=NOW()""",
+                tenant_id, account_id, account_signal_id,
+                min(0.95, 0.50 + score / 200),
+                json.dumps({"source": source, "external_id": external_id}),
             )
 
         demand_key = next((k for k in DEMAND_MAP if k in signal_type.lower()), None)
@@ -267,6 +278,17 @@ async def ingest_signal(
             )
         else:
             hypothesis = None
+
+        if account_id and hypothesis:
+            await conn.execute(
+                """INSERT INTO account_graph_edges
+                   (tenant_id, account_id, source_type, source_id, target_type, target_id, relation, confidence, metadata)
+                   VALUES ($1,$2,'account',$2,'hypothesis',$3,'demand_hypothesis',$4,$5::jsonb)
+                   ON CONFLICT (tenant_id, source_type, source_id, relation, target_type, target_id)
+                   DO UPDATE SET confidence=EXCLUDED.confidence, metadata=EXCLUDED.metadata, updated_at=NOW()""",
+                tenant_id, account_id, hypothesis["id"], hypothesis["confidence"],
+                json.dumps({"demand_type": hypothesis["demand_type"]}),
+            )
 
         await conn.execute(
             "UPDATE signal_ingestion_runs SET accepted_count=1, status='completed', completed_at=NOW() WHERE id=$1",

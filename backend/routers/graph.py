@@ -35,6 +35,40 @@ async def get_account_graph(
                ORDER BY observed_at DESC LIMIT 200""",
             tenant_id, account["id"],
         )
+        technologies = await conn.fetch(
+            """SELECT id, name, category, version, first_seen_at, last_seen_at, attributes
+               FROM technologies WHERE tenant_id=$1 AND organization_id=(
+                   SELECT organization_id FROM accounts WHERE tenant_id=$1 AND id=$2
+               )
+               ORDER BY last_seen_at DESC LIMIT 200""",
+            tenant_id, account["id"],
+        )
+        initiatives = await conn.fetch(
+            """SELECT id, name, initiative_type, status, started_at, ended_at, confidence, attributes
+               FROM initiatives WHERE tenant_id=$1 AND organization_id=(
+                   SELECT organization_id FROM accounts WHERE tenant_id=$1 AND id=$2
+               )
+               ORDER BY updated_at DESC LIMIT 100""",
+            tenant_id, account["id"],
+        )
+        opportunities = await conn.fetch(
+            """SELECT id, name, stage, score, confidence, estimated_value, currency,
+                      buying_window_start, buying_window_end, created_at, updated_at
+               FROM opportunities WHERE tenant_id=$1 AND organization_id=(
+                   SELECT organization_id FROM accounts WHERE tenant_id=$1 AND id=$2
+               )
+               ORDER BY updated_at DESC LIMIT 100""",
+            tenant_id, account["id"],
+        )
+        edges = await conn.fetch(
+            """SELECT id, source_type, source_id, target_type, target_id, relation,
+                      confidence, evidence_id, valid_from, valid_to, metadata
+               FROM account_graph_edges
+               WHERE tenant_id=$1 AND account_id=$2
+                 AND (valid_to IS NULL OR valid_to > NOW())
+               ORDER BY updated_at DESC LIMIT 500""",
+            tenant_id, account["id"],
+        )
         hypotheses = await conn.fetch(
             """SELECT id, why_now, demand_type, recommended_offer,
                       evidence, confidence, status, created_at
@@ -49,10 +83,18 @@ async def get_account_graph(
         "people": [dict(row) for row in people],
         "signals": [dict(row) for row in signals],
         "demand_hypotheses": [dict(row) for row in hypotheses],
+        "technologies": [dict(row) for row in technologies],
+        "initiatives": [dict(row) for row in initiatives],
+        "opportunities": [dict(row) for row in opportunities],
+        "edges": [dict(row) for row in edges],
         "graph_semantics": {
             "account": "company/entity",
             "people": "buyer/contact",
             "signals": "observed change",
             "demand_hypotheses": "reasoned opportunity hypothesis",
+            "technologies": "observed technology",
+            "initiatives": "organizational initiative",
+            "opportunities": "commercial opportunity",
+            "edges": "typed, tenant-scoped, evidence-linkable relationship",
         },
     }

@@ -293,6 +293,7 @@ Key references:
 - [Phase 3 — Signal Ingestion](docs/PHASE_03_SIGNAL_INGESTION.md)
 - [Phase 4 — Signal Convergence](docs/PHASE_04_SIGNAL_CONVERGENCE.md)
 - [Phase 5 — Temporal Intelligence](docs/PHASE_05_TEMPORAL_INTELLIGENCE.md)
+- [Phase 6 — Account Intelligence Graph](docs/PHASE_06_ACCOUNT_GRAPH.md)
 - [Supply-Chain Evidence](docs/SUPPLY_CHAIN.md)
 
 Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.
