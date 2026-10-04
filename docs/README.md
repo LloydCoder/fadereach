@@ -51,6 +51,7 @@ TADS and SDEA provide upstream demand/account intelligence. FadeReach converts v
 33. [Final Audit Checklist](FINAL_AUDIT_CHECKLIST.md)
 34. [CI Verification](ci-verification.md)
 35. [Phase Gates](phase-gates.md)
+36. [Final Forensic Enterprise Audit](FINAL_FORENSIC_AUDIT.md)
 
 ## Integration references
 
