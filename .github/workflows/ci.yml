@@ -65,7 +65,7 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
         run: |
           python -c "from main import app; print('routes', len(app.routes))"
-          pytest -q tests
+          PYTHONPATH=. pytest -q tests
 
   frontend:
     name: Frontend build
