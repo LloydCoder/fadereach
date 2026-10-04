@@ -21,7 +21,7 @@ def upgrade() -> None:
         DO $$
         BEGIN
             IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'fadereach_worker') THEN
-                GRANT CONNECT ON DATABASE current_database() TO fadereach_worker;
+                EXECUTE format('GRANT CONNECT ON DATABASE %I TO fadereach_worker', current_database());
                 GRANT USAGE ON SCHEMA public TO fadereach_worker;
                 GRANT SELECT, UPDATE ON execution_jobs TO fadereach_worker;
             END IF;
