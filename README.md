@@ -78,6 +78,7 @@ Tinlance Agent Platform and Tinlance Agent OS are separate governed execution/wo
 - **React/Vite** — web application.
 - **Nginx/Cloudflare** — edge and TLS layer.
 - **Docker/systemd** — deployment primitives for the current single-host production path.
+- **Dedicated worker** — durable outbound execution and retention enforcement, separated from HTTP API replicas.
 
 The production topology is intentionally simple until measured scale justifies additional distributed infrastructure.
 
@@ -280,5 +281,6 @@ Key references:
 - [Intelligence Model](docs/INTELLIGENCE_MODEL.md)
 - [Autonomy Governance](docs/AUTONOMY_GOVERNANCE.md)
 - [Production Readiness](docs/PRODUCTION_READINESS.md)
+- [Supply-Chain Evidence](docs/SUPPLY_CHAIN.md)
 
 Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.

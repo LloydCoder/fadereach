@@ -65,14 +65,11 @@ FadeReach owns application state, tenant/resource authorization, campaign state,
 4. API/workers → Redis.
 5. API → dedicated worker via PostgreSQL-backed durable state; the API does not own worker lifecycle.
 6. Worker → PostgreSQL/provider infrastructure.
-5. API/workers → outbound providers.
-6. Provider → webhook ingress.
-7. Tenant user → application.
-8. AI/model → application decision layer.
-9. FadeReach → TADS/SDEA.
-10. FadeReach → Agent Platform/OS.
-
-Each boundary requires explicit authentication, authorization, validation, logging and failure behavior appropriate to its risk.
+7. Provider → webhook ingress.
+8. Tenant user → application.
+9. AI/model → application decision layer.
+10. FadeReach → TADS/SDEA.
+11. FadeReach → Agent Platform/OS.
 
 ## Data-flow rules
 
