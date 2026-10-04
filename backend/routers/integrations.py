@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from .deps import get_current_tenant
+from tenant_context import tenant_id_context
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -75,7 +76,7 @@ async def ingest_signal(
             raise HTTPException(400, "Each evidence item requires source and claim")
 
     db = request.app.state.db
-    db = request.app.state.db
+    tenant_ctx = tenant_id_context.set(tenant_id)
     async with db.acquire() as conn:
         tenant = await conn.fetchval("SELECT id FROM tenants WHERE id=$1", tenant_id)
         if not tenant:
@@ -147,6 +148,7 @@ async def ingest_signal(
         else:
             hypothesis = None
 
+    tenant_id_context.reset(tenant_ctx)
     return {
         "signal_id": row["id"],
         "demand_hypothesis_id": hypothesis["id"] if hypothesis else None,
