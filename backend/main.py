@@ -7,7 +7,6 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
-import asyncio
 import asyncpg, redis.asyncio as aioredis
 import os
 from datetime import datetime
@@ -20,9 +19,6 @@ from observability import collect_metrics
 DB_URL      = os.getenv("DATABASE_URL")
 REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
-WORKER_DB_URL = os.getenv("WORKER_DATABASE_URL") or DB_URL
-if ENVIRONMENT == "production" and not os.getenv("WORKER_DATABASE_URL"):
-    raise RuntimeError("WORKER_DATABASE_URL must be configured in production")
 if not DB_URL:
     raise RuntimeError("DATABASE_URL must be configured")
 APP_URL     = os.getenv("APP_URL", "https://fadereach.tinlance.com")
