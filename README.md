@@ -254,7 +254,7 @@ Recommended commercial packaging is intentionally separated from infrastructure 
 
 ## License
 
-See the repository license and third-party dependency notices before distribution.
+FadeReach is proprietary software owned by **Tinlance Limited**. See the root [LICENSE](LICENSE) and [Licensing](docs/LICENSING.md) policy before using, distributing, or commercializing the repository. Third-party dependencies remain subject to their own licenses and notices.
 
 ---
 
