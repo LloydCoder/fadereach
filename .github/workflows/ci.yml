@@ -120,4 +120,5 @@ jobs:
       - run: |
           bash -n infrastructure/setup.sh
           bash -n infrastructure/provision_tenant.sh
+          bash -n infrastructure/postgres/init/01-databases.sh
           bash -n scripts/ec2_app_setup.sh
