@@ -92,8 +92,8 @@ This ledger also tracks the post-hardening product-completion program. It supers
 
 | Advanced phase | Scope | Status |
 |---|---|---|
-| 1 | Canonical revenue intelligence data model | **COMPLETE — CI-green on branch/PR gate** |
-| 2 | Evidence ledger | Pending |
+| 1 | Canonical revenue intelligence data model | **COMPLETE — merged and CI-green** |
+| 2 | Evidence ledger | **COMPLETE — CI-green on branch/PR gate** |
 | 3 | Signal ingestion & normalization | Pending |
 | 4 | Signal convergence engine | Pending |
 | 5 | Temporal intelligence | Pending |
