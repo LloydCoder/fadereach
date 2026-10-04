@@ -16,3 +16,15 @@ def test_phase_03_is_tenant_isolated():
     assert "signal_sources_tenant_isolation" in SOURCE
     assert "signal_ingestion_runs_tenant_isolation" in SOURCE
     assert "FORCE ROW LEVEL SECURITY" in SOURCE
+
+from routers.integrations import _normalize_signal, _source_trust_tier
+
+def test_signal_normalization_is_deterministic():
+    assert _normalize_signal("AWS migration hiring") == ("hiring", "workforce", 45)
+    assert _normalize_signal("security_incident") == ("security_incident", "security", 30)
+    assert _normalize_signal("unknown_custom_signal")[1] == "other"
+
+def test_source_trust_tier_contract():
+    assert _source_trust_tier("tads") == "T1"
+    assert _source_trust_tier("sdea") == "T1"
+    assert _source_trust_tier("reconos") == "T2"
