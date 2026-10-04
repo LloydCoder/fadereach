@@ -24,7 +24,7 @@ DOMAIN="fadereach.app"
 SENDING_DOMAIN_1="fr-send1.com"       # Primary sending domain
 SENDING_DOMAIN_2="fr-send2.com"       # Secondary rotation domain
 VPS_IP="YOUR_VPS_IP"                   # Replace with Contabo IP
-ADMIN_EMAIL="nwachukwuchinaemerem8@gmail.com"
+ADMIN_EMAIL="${ADMIN_EMAIL:-admin@$DOMAIN}"
 POSTGRES_PASSWORD=$(openssl rand -base64 24)
 POSTGRES_RUNTIME_PASSWORD=$(openssl rand -base64 24)
 JWT_SECRET=$(openssl rand -base64 48)
@@ -269,62 +269,33 @@ systemctl enable fail2ban
 log "Fail2Ban active"
 
 section "STEP 9 — Nginx Base Configuration"
+# Bootstrap with HTTP only. Certbot adds TLS after DNS is ready; this avoids
+# referencing certificates that do not exist yet.
 cat > /etc/nginx/sites-available/fadereach <<EOF
-# FadeReach Main App
 server {
     listen 80;
     server_name $DOMAIN www.$DOMAIN;
-    return 301 https://\$server_name\$request_uri;
-}
-
-server {
-    listen 443 ssl http2;
-    server_name $DOMAIN www.$DOMAIN;
-
-    # SSL — certbot will fill these
-    ssl_certificate /etc/letsencrypt/live/$DOMAIN/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/$DOMAIN/privkey.pem;
-
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-    ssl_prefer_server_ciphers on;
-
-    # Security headers
-    add_header X-Frame-Options "SAMEORIGIN";
-    add_header X-Content-Type-Options "nosniff";
-    add_header X-XSS-Protection "1; mode=block";
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains";
-    add_header Referrer-Policy "strict-origin-when-cross-origin";
-
-    # React frontend
     location / {
-        proxy_pass http://localhost:3000;
+        proxy_pass http://127.0.0.1:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
+        proxy_set_header Connection "upgrade";
         proxy_set_header Host \$host;
-        proxy_cache_bypass \$http_upgrade;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     }
-
-    # FastAPI backend
     location /api/ {
-        proxy_pass http://localhost:8000/;
+        proxy_pass http://127.0.0.1:8000/api/;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
         proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
     }
 }
-
-# Internal Listmonk instance (Lloyd's campaigns)
 server {
-    listen 443 ssl http2;
+    listen 80;
     server_name campaigns.tinlance.com;
-
-    ssl_certificate /etc/letsencrypt/live/campaigns.tinlance.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/campaigns.tinlance.com/privkey.pem;
-
     location / {
-        proxy_pass http://localhost:9100;
+        proxy_pass http://127.0.0.1:9100;
         proxy_set_header Host \$host;
         proxy_set_header X-Real-IP \$remote_addr;
     }
@@ -333,7 +304,7 @@ EOF
 
 ln -sf /etc/nginx/sites-available/fadereach /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
-log "Nginx configured"
+log "Nginx HTTP bootstrap configured"
 
 section "STEP 10 — Internal Listmonk (Lloyd's Campaigns)"
 mkdir -p /opt/fadereach/listmonk-internal
