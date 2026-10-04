@@ -1,0 +1,55 @@
+# FadeReach Documentation
+
+This directory is the normative engineering and operational documentation for FadeReach, Tinlance's AI outbound intelligence and revenue-execution platform.
+
+## Documentation contract
+
+Documentation is part of the production surface. A change is incomplete when implementation, tests, security controls, deployment assumptions, operational behavior, and documentation disagree.
+
+**Normative language:** MUST/SHOULD/MAY are used in their conventional requirements sense. Legal and provider requirements are external constraints; this repository does not represent legal advice or guarantee deliverability.
+
+## System boundary
+
+FadeReach owns outbound intelligence, campaign control, tenant/application state, provider adapters, deliverability controls, audit semantics, outcomes and revenue learning. Tinlance Agent Platform and Agent OS remain separate governed execution/workspace systems. FadeReach integrates with them instead of duplicating their authority, sandbox, policy, audit or runtime responsibilities.
+
+TADS and SDEA provide upstream demand/account intelligence. FadeReach converts validated signals and evidence into controlled outbound actions. FDSE/FDE consumes qualified commercial outcomes downstream.
+
+## Reading order
+
+1. [Architecture](ARCHITECTURE.md)
+2. [Data Model](DATA_MODEL.md)
+3. [API](API.md)
+4. [Security](SECURITY.md)
+5. [Threat Model](THREAT_MODEL.md)
+6. [Secrets Management](SECRETS_MANAGEMENT.md)
+7. [Audit Logging](AUDIT_LOGGING.md)
+8. [Configuration](CONFIGURATION.md)
+9. [Deployment](DEPLOYMENT.md)
+10. [Operations Runbook](OPERATIONS_RUNBOOK.md)
+11. [Disaster Recovery](DISASTER_RECOVERY.md)
+12. [Incident Response](INCIDENT_RESPONSE.md)
+13. [Observability](OBSERVABILITY.md)
+14. [Testing](TESTING.md)
+15. [Deliverability](DELIVERABILITY.md)
+16. [Compliance](COMPLIANCE.md)
+17. [Data Governance](DATA_GOVERNANCE.md)
+18. [Intelligence Model](INTELLIGENCE_MODEL.md)
+19. [Campaign Lifecycle](CAMPAIGN_LIFECYCLE.md)
+20. [Autonomy Governance](AUTONOMY_GOVERNANCE.md)
+21. [Enterprise](ENTERPRISE.md)
+22. [Agency](AGENCY.md)
+23. [Release Management](RELEASES.md)
+
+## Integration references
+
+- [TADS/SDEA](integrations/tads-sdea.md)
+- [Listmonk](integrations/listmonk.md)
+- [n8n](integrations/n8n.md)
+
+## External control baselines
+
+Security design references OWASP Top 10:2025, NIST CSF 2.0 and NIST AI RMF. Email controls track current major-provider sender requirements. Compliance controls are jurisdiction-aware and never represented as universal legal guarantees.
+
+## Change control
+
+Every material behavior change MUST update the affected documentation in the same change set. Phase completion requires implementation, tests, workflow evidence and documentation reconciliation.
