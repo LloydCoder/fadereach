@@ -14,7 +14,7 @@ def upgrade() -> None:
             tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
             account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
             source_type TEXT NOT NULL
-                CHECK (source_type IN ('account','person','technology','initiative','signal','evidence','opportunity','campaign','outcome')),
+                CHECK (source_type IN ('account','person','technology','initiative','signal','evidence','opportunity','hypothesis','campaign','outcome')),
             source_id BIGINT NOT NULL,
             target_type TEXT NOT NULL
                 CHECK (target_type IN ('account','person','technology','initiative','signal','evidence','opportunity','campaign','outcome')),
