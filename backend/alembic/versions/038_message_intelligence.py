@@ -10,6 +10,6 @@ def upgrade():
  evidence_refs JSONB NOT NULL DEFAULT '[]'::jsonb, occurred_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
  metadata JSONB NOT NULL DEFAULT '{}'::jsonb);
  ALTER TABLE message_intelligence_events ENABLE ROW LEVEL SECURITY; ALTER TABLE message_intelligence_events FORCE ROW LEVEL SECURITY;
- CREATE POLICY message_intelligence_events_tenant ON message_intelligence_events USING (tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK (tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));
+ CREATE POLICY message_intelligence_events_tenant_isolation ON message_intelligence_events USING (tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK (tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));
  CREATE INDEX IF NOT EXISTS idx_message_intel_lookup ON message_intelligence_events(tenant_id,signal_type,persona,hypothesis_type,occurred_at DESC);""")
 def downgrade(): op.execute("DROP TABLE IF EXISTS message_intelligence_events CASCADE")
