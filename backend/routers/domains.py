@@ -138,7 +138,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "complaint_rate_critical",
             "message": f"Complaint rate {complaint_rate:.3f}% — above 0.08% limit",
             "fix": "Stop all campaigns. Review targeting and ICP fit. Improve unsubscribe visibility.",
-            "impact": "Google Postmaster will downgrade domain reputation to Low"
+            "impact": "Elevated complaint rates can degrade sender reputation and trigger provider filtering."
         })
     elif complaint_rate > 0.05:
         score -= 10
