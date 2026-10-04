@@ -32,9 +32,6 @@ async def lifespan(app: FastAPI):
     await app.state.db.close()
     await app.state.redis.close()
 
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
-app.add_middleware(SecurityHeadersMiddleware)
-
 app = FastAPI(
     title="FadeReach API",
     description="Opportunity Intelligence + Deliverability Intelligence — Tinlance Limited",
@@ -43,6 +40,8 @@ app = FastAPI(
     docs_url="/api/docs" if ENVIRONMENT == "development" else None,
 )
 
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=allowed_hosts())
+app.add_middleware(SecurityHeadersMiddleware)
 
 
 @app.middleware("http")
