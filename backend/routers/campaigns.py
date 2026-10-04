@@ -371,6 +371,16 @@ async def pause_campaign(
         )
         await conn.execute(
             """
+            UPDATE campaign_executions
+            SET status='cancelled', completed_at=NOW(), updated_at=NOW()
+            WHERE campaign_id=$1
+              AND tenant_id=$2
+              AND status='queued'
+            """,
+            campaign_id, auth["sub"],
+        )
+        await conn.execute(
+            """
             UPDATE execution_jobs
             SET status='cancelled', completed_at=NOW(), updated_at=NOW()
             WHERE execution_id IN (
