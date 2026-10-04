@@ -230,10 +230,11 @@ async def ingest_signal(
         else:
             hypothesis = None
 
-    await conn.execute(
-        "UPDATE signal_ingestion_runs SET accepted_count=1, status='completed', completed_at=NOW() WHERE id=$1",
-        run_id,
-    )
+        await conn.execute(
+            "UPDATE signal_ingestion_runs SET accepted_count=1, status='completed', completed_at=NOW() WHERE id=$1",
+            run_id,
+        )
+
     tenant_id_context.reset(tenant_ctx)
     return {
         "signal_id": row["id"],
