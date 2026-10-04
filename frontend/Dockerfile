@@ -1,11 +1,11 @@
-FROM node:20-alpine AS build
+FROM node:20.19.5-alpine3.22 AS build
 WORKDIR /app
 COPY package.json ./
 RUN npm install --no-audit --no-fund
 COPY . .
 RUN npm run build
 
-FROM nginxinc/nginx-unprivileged:alpine
+FROM nginxinc/nginx-unprivileged:1.31.6-alpine3.24
 COPY nginx.conf /etc/nginx/nginx.conf
 COPY --from=build /app/dist /usr/share/nginx/html
 EXPOSE 8080

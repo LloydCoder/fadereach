@@ -107,23 +107,28 @@ fadereach/
 
 The repository is being hardened in serial production phases. Green CI is a hard phase gate, not proof of production readiness. No subsequent phase is accepted until the current phase has a completed CI/workflow run on its actual code.
 
-Current sequence:
+Current enterprise sequence:
 
 1. **F0 — Forensic reconciliation**
-2. **F1 — Production foundation**
+2. **F1 — Deterministic production foundation**
 3. **F2 — Database and tenancy**
 4. **F3 — Security hardening**
-5. **F4 — Outbound execution**
+5. **F4 — Durable outbound execution**
 6. **F5 — Deliverability control plane**
-7. **F6 — Intelligence engine**
-8. **F7 — TADS/SDEA integration**
-9. **F8 — Outbound Intelligence Graph**
-10. **F9 — Campaign Autopilot**
-11. **F10 — Learning and attribution**
-12. **F11 — Agency and enterprise**
-13. **F12 — Autonomous governed GTM**
+7. **F6 — Compliance and data governance**
+8. **F7 — Intelligence engine**
+9. **F8 — TADS/SDEA integration**
+10. **F9 — Outbound Intelligence Graph**
+11. **F10 — Campaign Autopilot**
+12. **F11 — Learning and revenue attribution**
+13. **F12 — Agency platform**
+14. **F13 — Enterprise platform**
+15. **F14 — Reliability, observability and disaster recovery**
+16. **F15 — Production operations**
+17. **F16 — Governed autonomous GTM**
+18. **F17 — Final forensic enterprise audit**
 
-A phase is not considered complete merely because code exists. Its implementation, documentation, tests, deployment assumptions and CI/workflow evidence must reconcile.
+A phase is not complete merely because code exists. The implementation, documentation, tests, deployment assumptions, security controls and CI/workflow evidence must reconcile. A phase gate requires a successful workflow run on the actual commit being promoted; a green CI run is necessary but is not by itself proof of production readiness.
 
 ## Local development
 
@@ -188,7 +193,7 @@ Campaign policy must account for the recipient jurisdiction, subscriber/customer
 
 ## Production deployment
 
-The repository contains deployment automation, but production deployment is intentionally gated. For a fresh Ubuntu host, `sudo bash infrastructure/setup.sh` is the canonical bootstrap; it uses the Compose topology and does not install competing host PostgreSQL/Redis/Listmonk/n8n services. Never treat a GitHub commit as evidence that the running server has been updated.
+The repository contains deployment automation, but production deployment is intentionally gated. For a fresh Ubuntu host, `sudo bash infrastructure/setup.sh` is the canonical bootstrap; it uses the Compose topology and does not install competing host PostgreSQL/Redis/Listmonk/n8n services. The current bootstrap expects to be run from a checked-out repository and creates only the infrastructure secrets it can safely generate locally. Never treat a GitHub commit as evidence that the running server has been updated.
 
 Before production promotion:
 
