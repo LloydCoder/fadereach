@@ -289,6 +289,7 @@ Key references:
 - [Autonomy Governance](docs/AUTONOMY_GOVERNANCE.md)
 - [Production Readiness](docs/PRODUCTION_READINESS.md)
 - [Phase 1 — Canonical Revenue Intelligence Model](docs/PHASE_01_CANONICAL_REVENUE_MODEL.md)
+- [Phase 2 — Evidence Ledger](docs/PHASE_02_EVIDENCE_LEDGER.md)
 - [Supply-Chain Evidence](docs/SUPPLY_CHAIN.md)
 
 Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.
