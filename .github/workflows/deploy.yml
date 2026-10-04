@@ -26,7 +26,7 @@ jobs:
           test -f backend/Dockerfile
           test -f frontend/Dockerfile
           test -f frontend/nginx.conf
-          test -f infrastructure/postgres/init/01-databases.sql
+          test -f infrastructure/postgres/init/01-databases.sh
 
       - name: Verify Compose configuration
         run: |
