@@ -98,7 +98,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "dkim_missing",
             "message": "DKIM not configured",
             "fix": "Run setup.sh to generate 2048-bit DKIM key, add TXT record to mail._domainkey",
-            "impact": "-10-15% inbox placement immediately"
+            "impact": "Unauthenticated mail is more likely to be rejected or filtered; placement impact varies by provider and reputation."
         })
     if not dns.get("dmarc"):
         score -= 20
@@ -107,7 +107,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "dmarc_missing",
             "message": "DMARC policy missing",
             "fix": "Add TXT record to _dmarc: v=DMARC1; p=none; rua=mailto:dmarc@yourdomain.com",
-            "impact": "Required by Gmail and Yahoo — non-compliance = spam folder"
+            "impact": "Required by major mailbox providers for relevant bulk-sender scenarios; enforcement and placement outcomes vary by provider."
         })
 
     # Bounce rate (20 points)
@@ -118,7 +118,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "bounce_rate_critical",
             "message": f"Bounce rate {bounce_rate:.1f}% — above 2% limit",
             "fix": "Pause campaigns immediately. Clean your list with Reacher before resuming.",
-            "impact": "Sending reputation severely damaged — domain may be blacklisted"
+            "impact": "Elevated bounce rates can damage sender reputation and trigger provider enforcement."
         })
     elif bounce_rate > 1.5:
         score -= 10
@@ -138,7 +138,7 @@ def calculate_health_score(dns: dict, bounce_rate: float,
             "type": "complaint_rate_critical",
             "message": f"Complaint rate {complaint_rate:.3f}% — above 0.08% limit",
             "fix": "Stop all campaigns. Review targeting and ICP fit. Improve unsubscribe visibility.",
-            "impact": "Google Postmaster will downgrade domain reputation to Low"
+            "impact": "Elevated complaint rates can degrade sender reputation and trigger provider filtering."
         })
     elif complaint_rate > 0.05:
         score -= 10

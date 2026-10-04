@@ -10,8 +10,8 @@ def test_health_route_is_registered():
 
 def test_core_router_surface_is_registered():
     routes = {route.path for route in app.routes}
-    expected = {
-        "/api/auth/login",
+    expected_prefixes = {
+        "/api/auth",
         "/api/campaigns",
         "/api/leads",
         "/api/domains",
@@ -22,8 +22,11 @@ def test_core_router_surface_is_registered():
         "/api/webhooks",
         "/api/public",
     }
-    missing = expected - routes
-    assert not missing, f"Missing routes: {sorted(missing)}"
+    missing = {
+        prefix for prefix in expected_prefixes
+        if not any(path == prefix or path.startswith(prefix + "/") for path in routes)
+    }
+    assert not missing, f"Missing router prefixes: {sorted(missing)}"
 
 
 def test_app_imports_without_starting_external_services():

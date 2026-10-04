@@ -12,7 +12,9 @@ from datetime import datetime
 from tenant_context import tenant_id_context
 from db import TenantAwarePool
 
-DB_URL      = os.getenv("DATABASE_URL", "postgresql://fadereach_runtime:password@localhost/fadereach_meta")
+DB_URL      = os.getenv("DATABASE_URL")
+if not DB_URL:
+    raise RuntimeError("DATABASE_URL must be configured")
 REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 APP_URL     = os.getenv("APP_URL", "https://fadereach.tinlance.com")
