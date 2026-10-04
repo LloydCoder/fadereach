@@ -25,7 +25,7 @@ def upgrade() -> None:
                 GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO fadereach_runtime;
                 GRANT USAGE, SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA public TO fadereach_runtime;
 
-                ALTER DEFAULT PRIVILEGES FOR ROLE fadereach IN SCHEMA public
+                ALTER DEFAULT PRIVILEGES IN SCHEMA public
                     GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO fadereach_runtime;
                 ALTER DEFAULT PRIVILEGES FOR ROLE fadereach IN SCHEMA public
                     GRANT USAGE, SELECT, UPDATE ON SEQUENCES TO fadereach_runtime;
