@@ -186,6 +186,7 @@ async def _execute(db, job: dict) -> None:
             )
 
         body = _to_listmonk_template(execution["body_html"])
+        body += '\n\n<p><a href="{{ UnsubscribeURL }}">Unsubscribe</a></p>'
         external_id = await _ensure_campaign(
             client,
             base,
@@ -368,6 +369,10 @@ async def _ensure_campaign(
             "messenger": "email",
             "type": "regular",
             "body": body,
+            "headers": [
+                {"List-Unsubscribe": "<{{ UnsubscribeURL }}>"},
+                {"List-Unsubscribe-Post": "List-Unsubscribe=One-Click"},
+            ],
         },
     )
     if response.status_code >= 300:
