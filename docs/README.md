@@ -54,6 +54,7 @@ TADS and SDEA provide upstream demand/account intelligence. FadeReach converts v
 36. [Final Forensic Enterprise Audit](FINAL_FORENSIC_AUDIT.md)
 37. [Phase 1 — Canonical Revenue Intelligence Model](PHASE_01_CANONICAL_REVENUE_MODEL.md)
 38. [Phase 2 — Evidence Ledger](PHASE_02_EVIDENCE_LEDGER.md)
+39. [Phase 3 — Signal Ingestion](PHASE_03_SIGNAL_INGESTION.md)
 
 ## Advanced enterprise phase sequence
 

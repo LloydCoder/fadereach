@@ -290,6 +290,7 @@ Key references:
 - [Production Readiness](docs/PRODUCTION_READINESS.md)
 - [Phase 1 — Canonical Revenue Intelligence Model](docs/PHASE_01_CANONICAL_REVENUE_MODEL.md)
 - [Phase 2 — Evidence Ledger](docs/PHASE_02_EVIDENCE_LEDGER.md)
+- [Phase 3 — Signal Ingestion](docs/PHASE_03_SIGNAL_INGESTION.md)
 - [Supply-Chain Evidence](docs/SUPPLY_CHAIN.md)
 
 Documentation is a production artifact: behavior changes must reconcile implementation, tests, security controls, operational assumptions and documentation in the same change set.
