@@ -4,6 +4,7 @@ LLM output, when later added, remains a hypothesis layer. Evidence and
 authoritative lead state stay in the database.
 """
 import json
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from .deps import get_current_tenant
 
@@ -77,23 +78,50 @@ async def get_lead_intelligence(
             ),
         )
 
-        evidence = [
-            {
-                "source": "lead_record",
-                "claim": "Lead identity and firmographic data",
-                "source_ref": f"lead:{lead_id}",
-                "confidence": 1.0,
-            }
-        ]
+        retrieved_at = datetime.now(timezone.utc).isoformat()
+        evidence = [{
+            "evidence_type": "record",
+            "source": "lead_record",
+            "claim": "Lead identity and firmographic data",
+            "source_ref": f"lead:{lead_id}",
+            "source_url": None,
+            "observed_at": row["created_at"].isoformat() if row["created_at"] else None,
+            "retrieved_at": retrieved_at,
+            "confidence": 1.0,
+            "status": "SUPPORTED",
+        }]
         if signal_type:
+            signal_url = (
+                signal_data.get("source_url")
+                or signal_data.get("url")
+                or signal_data.get("page_url")
+            )
             evidence.append({
-                "source": "signal_data",
+                "evidence_type": "signal",
+                "source": signal_data.get("source") or signal_type,
                 "claim": signal_type,
                 "source_ref": f"lead:{lead_id}:signal",
-                "observed_at": row["created_at"].isoformat() if row["created_at"] else None,
+                "source_url": signal_url,
+                "observed_at": (
+                    signal_data.get("observed_at")
+                    or signal_data.get("discovered_at")
+                    or row["created_at"].isoformat() if row["created_at"] else None
+                ),
+                "retrieved_at": retrieved_at,
                 "data": signal_data,
-                "confidence": 0.85,
+                "confidence": 0.85 if signal_url else 0.70,
+                "status": "SUPPORTED" if signal_url else "PARTIAL",
             })
+
+        evidence_status = "UNKNOWN"
+        if signal_type and len(evidence) >= 2:
+            evidence_status = "SUPPORTED" if any(
+                item["status"] == "SUPPORTED" and item.get("source_url")
+                for item in evidence
+            ) else "PARTIAL"
+        elif row["company"]:
+            evidence_status = "PARTIAL"
+
 
         intelligence = {
             "fit_score": fit_score,
@@ -113,17 +141,23 @@ async def get_lead_intelligence(
             ),
             "evidence": evidence,
             "confidence": round(
-                min(0.95, 0.55 + (0.20 if signal_type else 0) + (0.15 if row["company"] else 0)),
+                0.85 if evidence_status == "SUPPORTED"
+                else 0.65 if evidence_status == "PARTIAL"
+                else 0.25,
                 3,
             ),
+            "evidence_status": evidence_status,
+            "evidence_contract_version": "1",
+            "evidence_freshness_days": 30 if signal_type else None,
             "model_version": "deterministic-v1",
         }
 
         saved = await conn.fetchrow(
             """INSERT INTO lead_intelligence
                (tenant_id, lead_id, fit_score, why_now, buyer_hypothesis,
-                problem_hypothesis, offer_angle, evidence, confidence, model_version)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10)
+                problem_hypothesis, offer_angle, evidence, confidence, model_version,
+                evidence_status, evidence_contract_version, evidence_freshness_days)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,$9,$10,$11,$12,$13)
                ON CONFLICT (tenant_id, lead_id)
                DO UPDATE SET fit_score=EXCLUDED.fit_score,
                              why_now=EXCLUDED.why_now,
@@ -132,6 +166,9 @@ async def get_lead_intelligence(
                              offer_angle=EXCLUDED.offer_angle,
                              evidence=EXCLUDED.evidence,
                              confidence=EXCLUDED.confidence,
+                             evidence_status=EXCLUDED.evidence_status,
+                             evidence_contract_version=EXCLUDED.evidence_contract_version,
+                             evidence_freshness_days=EXCLUDED.evidence_freshness_days,
                              model_version=EXCLUDED.model_version,
                              updated_at=NOW()
                RETURNING id""",
@@ -139,6 +176,8 @@ async def get_lead_intelligence(
             intelligence["buyer_hypothesis"], intelligence["problem_hypothesis"],
             intelligence["offer_angle"], json.dumps(intelligence["evidence"]),
             intelligence["confidence"], intelligence["model_version"],
+            intelligence["evidence_status"], intelligence["evidence_contract_version"],
+            intelligence["evidence_freshness_days"],
         )
 
     return {"lead_id": lead_id, "intelligence_id": saved["id"], **intelligence}
