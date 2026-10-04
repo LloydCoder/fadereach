@@ -1,0 +1,5 @@
+"""Phase 22 SRE and disaster-recovery evidence."""
+from alembic import op
+revision="047_sre_dr"; down_revision="046_ai_evaluation"; branch_labels=None; depends_on=None
+def upgrade(): op.execute("""CREATE TABLE IF NOT EXISTS recovery_drills (id BIGSERIAL PRIMARY KEY,tenant_id TEXT NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,drill_type TEXT NOT NULL,rto_target_seconds INTEGER NOT NULL,rpo_target_seconds INTEGER NOT NULL,started_at TIMESTAMPTZ,completed_at TIMESTAMPTZ,status TEXT NOT NULL DEFAULT 'planned' CHECK(status IN('planned','running','passed','failed','unknown')),observations JSONB NOT NULL DEFAULT '{}'::jsonb,evidence_refs JSONB NOT NULL DEFAULT '[]'::jsonb,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()); ALTER TABLE recovery_drills ENABLE ROW LEVEL SECURITY; ALTER TABLE recovery_drills FORCE ROW LEVEL SECURITY; CREATE POLICY recovery_drills_tenant_isolation ON recovery_drills USING(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),'')) WITH CHECK(tenant_id::text=NULLIF(current_setting('app.tenant_id',true),''));""")
+def downgrade(): op.execute("DROP TABLE IF EXISTS recovery_drills CASCADE")
