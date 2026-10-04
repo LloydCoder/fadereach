@@ -416,25 +416,45 @@ def upgrade() -> None:
 
         -- All canonical tables are tenant isolated at the database boundary.
         ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE organizations FORCE ROW LEVEL SECURITY;
         ALTER TABLE people ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE people FORCE ROW LEVEL SECURITY;
         ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE products FORCE ROW LEVEL SECURITY;
         ALTER TABLE technologies ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE technologies FORCE ROW LEVEL SECURITY;
         ALTER TABLE initiatives ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE initiatives FORCE ROW LEVEL SECURITY;
         ALTER TABLE commercial_events ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE commercial_events FORCE ROW LEVEL SECURITY;
         ALTER TABLE observations ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE observations FORCE ROW LEVEL SECURITY;
         ALTER TABLE evidence ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE evidence FORCE ROW LEVEL SECURITY;
         ALTER TABLE signals ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE signals FORCE ROW LEVEL SECURITY;
         ALTER TABLE signal_clusters ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE signal_clusters FORCE ROW LEVEL SECURITY;
         ALTER TABLE opportunities ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE opportunities FORCE ROW LEVEL SECURITY;
         ALTER TABLE opportunity_hypotheses ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE opportunity_hypotheses FORCE ROW LEVEL SECURITY;
         ALTER TABLE buying_committees ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE buying_committees FORCE ROW LEVEL SECURITY;
         ALTER TABLE buying_committee_members ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE buying_committee_members FORCE ROW LEVEL SECURITY;
         ALTER TABLE sequences ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE sequences FORCE ROW LEVEL SECURITY;
         ALTER TABLE executions ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE executions FORCE ROW LEVEL SECURITY;
         ALTER TABLE meetings ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE meetings FORCE ROW LEVEL SECURITY;
         ALTER TABLE deals ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE deals FORCE ROW LEVEL SECURITY;
         ALTER TABLE revenue ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE revenue FORCE ROW LEVEL SECURITY;
         ALTER TABLE outcomes ENABLE ROW LEVEL SECURITY;
+        ALTER TABLE outcomes FORCE ROW LEVEL SECURITY;
 
         CREATE POLICY organizations_tenant_isolation ON organizations
             USING (tenant_id::text = NULLIF(current_setting('app.tenant_id', true), ''))
