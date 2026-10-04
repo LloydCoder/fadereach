@@ -12,6 +12,7 @@ from temporal_intelligence import persist_trajectory
 from why_now import persist_why_now
 from opportunity_hypothesis import persist_opportunity_hypothesis
 from buying_committee import persist_buying_committee
+from account_memory import refresh_account_memory
 
 router = APIRouter()
 SIGNAL_SECRET = os.getenv("SIGNAL_INGEST_SECRET", "")
@@ -334,6 +335,11 @@ async def ingest_signal(
                 json.dumps({"demand_type": hypothesis["demand_type"]}),
             )
 
+        if account_id:
+            memory = await refresh_account_memory(conn, tenant_id, account_id, organization_id)
+        else:
+            memory = {"status": "unknown", "reason": "no_account"}
+
         await conn.execute(
             "UPDATE signal_ingestion_runs SET accepted_count=1, status='completed', completed_at=NOW() WHERE id=$1",
             run_id,
@@ -346,6 +352,7 @@ async def ingest_signal(
         "why_now": why_now,
         "opportunity_hypothesis": opportunity_hypothesis,
         "buying_committee": buying_committee,
+        "account_memory": memory,
         "status": "accepted",
     }
 
