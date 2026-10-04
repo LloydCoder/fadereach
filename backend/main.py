@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 import asyncpg, redis.asyncio as aioredis
 import os
 from datetime import datetime
+from tenant_context import tenant_id_context
 
 DB_URL      = os.getenv("DATABASE_URL", "postgresql://fadereach:password@localhost/fadereach_meta")
 REDIS_URL   = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -17,7 +18,7 @@ APP_URL     = os.getenv("APP_URL", "https://fadereach.tinlance.com")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    app.state.db    = await asyncpg.create_pool(DB_URL, min_size=2, max_size=10)
+    app.state.db    = await asyncpg.create_pool(DB_URL, min_size=2, max_size=10, setup=_setup_db_connection)
     app.state.redis = await aioredis.from_url(REDIS_URL, decode_responses=True)
     await _init_db(app.state.db)
     print(f"✓ FadeReach API [{ENVIRONMENT}] → {APP_URL}")
@@ -33,10 +34,31 @@ app = FastAPI(
     docs_url="/api/docs" if ENVIRONMENT == "development" else None,
 )
 
+
+
+@app.middleware("http")
+async def tenant_context_scope(request: Request, call_next):
+    """Clear tenant context at request boundaries to prevent cross-request bleed."""
+    token = tenant_id_context.set(None)
+    try:
+        return await call_next(request)
+    finally:
+        tenant_id_context.reset(token)
+
 app.add_middleware(CORSMiddleware,
     allow_origins=["https://fadereach.tinlance.com","https://fadereach.ai","http://localhost:3000","http://localhost:5173"],
     allow_credentials=True, allow_methods=["*"], allow_headers=["*"],
 )
+
+
+
+async def _setup_db_connection(connection):
+    """Bind every checked-out PostgreSQL connection to the request tenant."""
+    tenant_id = tenant_id_context.get()
+    await connection.execute(
+        "SELECT set_config('app.tenant_id', $1, false)",
+        tenant_id or "",
+    )
 
 async def _init_db(pool):
     """Deprecated compatibility hook; schema is managed by Alembic."""
