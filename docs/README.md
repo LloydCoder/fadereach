@@ -63,6 +63,19 @@ TADS and SDEA provide upstream demand/account intelligence. FadeReach converts v
 45. [Phase 9 — Buying Committee](PHASE_09_BUYING_COMMITTEE.md)
 46. [Phase 10 — Account Memory](PHASE_10_ACCOUNT_MEMORY.md)
 47. [Phase 11 — Revenue Intelligence](PHASE_11_REVENUE_INTELLIGENCE.md)
+48. [Phase 12 — Message Intelligence](PHASE_12_MESSAGE_INTELLIGENCE.md)
+49. [Phase 13 — Evidence-Backed Personalization](PHASE_13_PERSONALIZATION.md)
+50. [Phase 14 — Governed AI](PHASE_14_GOVERNED_AI.md)
+51. [Phase 15 — Dynamic Autonomy](PHASE_15_DYNAMIC_AUTONOMY.md)
+52. [Phase 16 — Durable Outbound Execution](PHASE_16_DURABLE_EXECUTION.md)
+53. [Phase 17 — Deliverability Control Plane](PHASE_17_DELIVERABILITY_CONTROL.md)
+54. [Phase 18 — Provider Mesh](PHASE_18_PROVIDER_MESH.md)
+55. [Phase 19 — Experimentation](PHASE_19_EXPERIMENTATION.md)
+56. [Phase 20 — AI Evaluation](PHASE_20_AI_EVALUATION.md)
+57. [Phase 21 — Security & Supply Chain](PHASE_21_SECURITY_SUPPLY_CHAIN_AUDIT.md)
+58. [Phase 22 — SRE & DR](PHASE_22_SRE_DR.md)
+59. [Phase 23 — Governance & Trust](PHASE_23_GOVERNANCE_TRUST.md)
+60. [Phase 24 — Enterprise GA](PHASE_24_ENTERPRISE_GA.md)
 
 ## Advanced enterprise phase sequence
 
