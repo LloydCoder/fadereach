@@ -4,7 +4,7 @@ from __future__ import annotations
 
 ROLE_RULES = {
     "economic_buyer": ("ceo", "cfo", "chief executive", "chief financial", "president", "owner", "founder"),
-    "technical_buyer": ("cto", "vp engineering", "vp technology", "engineering", "platform", "architecture", "it director"),
+    "technical_buyer": ("cto", "chief technology", "chief information", "vp engineering", "vp technology", "engineering", "platform", "architecture", "it director"),
     "security": ("ciso", "security", "information security", "risk"),
     "procurement": ("procurement", "purchasing", "vendor management", "sourcing"),
     "finance": ("finance", "controller", "fp&a", "financial"),
