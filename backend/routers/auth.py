@@ -12,7 +12,9 @@ except:
     def gen_id(): return uuid.uuid4().hex[:12]
 
 router = APIRouter()
-JWT_SECRET   = os.getenv("JWT_SECRET", "change-in-production")
+JWT_SECRET   = os.getenv("JWT_SECRET", "")
+if os.getenv("ENVIRONMENT") == "production" and len(JWT_SECRET) < 32:
+    raise RuntimeError("JWT_SECRET must be configured with sufficient entropy")
 JWT_EXPIRE_H = 24
 RESEND_KEY   = os.getenv("RESEND_API_KEY", "")
 APP_URL      = os.getenv("APP_URL", "https://fadereach.tinlance.com")
@@ -29,7 +31,7 @@ class LoginReq(BaseModel):
 
 def make_token(tenant_id: str, plan: str) -> str:
     return jwt.encode(
-        {"sub": tenant_id, "plan": plan,
+        {"sub": tenant_id,
          "exp": datetime.utcnow() + timedelta(hours=JWT_EXPIRE_H)},
         JWT_SECRET, algorithm="HS256"
     )
