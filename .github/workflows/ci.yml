@@ -21,6 +21,19 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fadereach_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d fadereach_test"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -32,6 +45,10 @@ jobs:
         run: pip install -r requirements.txt
       - name: Compile
         run: python -m compileall -q .
+      - name: Verify Alembic migration chain
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fadereach_test
+        run: cd .. && alembic upgrade head
       - name: Import application
         env:
           ENVIRONMENT: test
