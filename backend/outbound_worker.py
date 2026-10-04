@@ -19,6 +19,9 @@ from tenant_context import tenant_id_context
 
 
 WORKER_ID = f"{socket.gethostname()}:{os.getpid()}"
+
+class ExecutionCancelled(RuntimeError):
+    """Terminal worker outcome: the campaign was intentionally stopped."""
 POLL_SECONDS = float(os.getenv("OUTBOUND_WORKER_POLL_SECONDS", "2"))
 LOCK_TIMEOUT_MINUTES = int(os.getenv("OUTBOUND_JOB_LOCK_TIMEOUT_MINUTES", "15"))
 
@@ -91,6 +94,27 @@ async def _run_job(db, job: dict) -> None:
                 """,
                 job["id"],
             )
+    except ExecutionCancelled as exc:
+        error = str(exc)[:2000]
+        async with db.acquire() as conn:
+            await conn.execute(
+                """
+                UPDATE execution_jobs
+                SET status='cancelled', completed_at=NOW(),
+                    locked_at=NULL, locked_by=NULL, last_error=$2, updated_at=NOW()
+                WHERE id=$1
+                """,
+                job["id"], error,
+            )
+            await conn.execute(
+                """
+                UPDATE campaign_executions
+                SET status='cancelled', cancel_requested=TRUE,
+                    error_message=$2, completed_at=NOW(), updated_at=NOW()
+                WHERE id=$1
+                """,
+                job["execution_id"], error,
+            )
     except Exception as exc:
         error = str(exc)[:2000]
         terminal = job["attempts"] >= job["max_attempts"]
@@ -144,7 +168,7 @@ async def _execute(db, job: dict) -> None:
         if not execution:
             raise RuntimeError("Execution or provider no longer exists")
         if execution["cancel_requested"] or execution["campaign_status"] in {"paused", "cancelled"}:
-            raise RuntimeError("Outbound execution cancelled before provider submission")
+            raise ExecutionCancelled("Outbound execution cancelled before provider submission")
 
         leads = await conn.fetch(
             """
