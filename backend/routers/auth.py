@@ -29,11 +29,11 @@ class LoginReq(BaseModel):
     email: EmailStr
     password: str = Field(min_length=1, max_length=72)
 
-def make_token(tenant_id: str, plan: str) -> str:
+def make_token(tenant_id: str, plan: str, ttl_minutes: int = JWT_EXPIRE_H * 60, mfa_verified: bool = False) -> str:
     now = datetime.utcnow()
     return jwt.encode(
-        {"sub": tenant_id, "iat": now,
-         "exp": now + timedelta(hours=JWT_EXPIRE_H),
+        {"sub": tenant_id, "iat": now, "mfa_verified": mfa_verified,
+         "exp": now + timedelta(minutes=ttl_minutes),
          "iss": "fadereach", "aud": "fadereach-api"},
         JWT_SECRET, algorithm="HS256"
     )
@@ -159,8 +159,17 @@ async def login(req: LoginReq, request: Request):
     if row["status"] == "suspended":
         raise HTTPException(403, "Account suspended — contact support@fadereach.tinlance.com")
 
+    async with db.acquire() as conn:
+        policy = await conn.fetchrow(
+            "SELECT session_ttl_minutes, mfa_required FROM enterprise_settings WHERE tenant_id=$1",
+            row["id"],
+        )
+    ttl_minutes = int(policy["session_ttl_minutes"]) if policy else JWT_EXPIRE_H * 60
+    if policy and policy["mfa_required"]:
+        raise HTTPException(403, "MFA is required for this workspace; complete the configured enterprise identity flow")
+
     return {
-        "token":     make_token(row["id"], row["plan"]),
+        "token":     make_token(row["id"], row["plan"], ttl_minutes=ttl_minutes),
         "tenant_id": row["id"],
         "plan":      row["plan"],
         "status":    row["status"]
