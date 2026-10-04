@@ -60,7 +60,7 @@ async def _suppress(request: Request, token: str):
     token_ctx = tenant_id_context.set(payload["tenant_id"])
     try:
         async with db.acquire() as conn:
-        await conn.execute(
+            await conn.execute(
             """
             INSERT INTO suppression_entries (tenant_id,email,reason,source)
             VALUES ($1,$2,'one_click_unsubscribe','list-unsubscribe')
