@@ -188,7 +188,7 @@ Campaign policy must account for the recipient jurisdiction, subscriber/customer
 
 ## Production deployment
 
-The repository contains deployment automation, but production deployment is intentionally gated. Never treat a GitHub commit as evidence that the running server has been updated.
+The repository contains deployment automation, but production deployment is intentionally gated. For a fresh Ubuntu host, `sudo bash infrastructure/setup.sh` is the canonical bootstrap; it uses the Compose topology and does not install competing host PostgreSQL/Redis/Listmonk/n8n services. Never treat a GitHub commit as evidence that the running server has been updated.
 
 Before production promotion:
 
