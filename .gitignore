@@ -1,34 +1,56 @@
-﻿# Environment — NEVER commit
+# Environment and secrets
 .env
 *.env
 .env.*
 !.env.example
-
-# Secrets
 .fadereach_secrets
 *.key
 *.private
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.jks
 
 # Python
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 .venv/
 venv/
+ENV/
+env/
 *.egg-info/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
 
-# Node
+# Node / frontend
 node_modules/
 dist/
 build/
 .next/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Docker overrides
+# Docker overrides and local state
 docker-compose.override.yml
 
-# Logs
+# Logs and runtime state
 *.log
+*.pid
+*.sqlite
+*.sqlite3
 
-# OS
+# OS / editor
 .DS_Store
 Thumbs.db
+.idea/
+.vscode/
