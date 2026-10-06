@@ -43,11 +43,15 @@ if [[ ! -f "$ENV_FILE" ]]; then
   umask 077
   cat > "$ENV_FILE" <<EOF
 DOMAIN=$DOMAIN
+APP_URL=https://$DOMAIN
 POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 POSTGRES_RUNTIME_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
+POSTGRES_WORKER_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 N8N_DB_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 LISTMONK_DB_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 JWT_SECRET=$(openssl rand -base64 64 | tr -d '=+/\n' | cut -c1-64)
+UNSUBSCRIBE_SECRET=$(openssl rand -base64 64 | tr -d '=+/\n' | cut -c1-64)
+SIGNAL_INGEST_SECRET=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)
 CREDENTIAL_ENCRYPTION_KEY=$(openssl rand -base64 32 | tr '+/' '-_' | tr -d '\n')
 N8N_ENCRYPTION_KEY=$(openssl rand -hex 32)
 LISTMONK_ADMIN_PASSWORD=$(openssl rand -base64 32 | tr -d '=+/\n' | cut -c1-32)

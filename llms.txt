@@ -1,0 +1,65 @@
+# FadeReach
+
+> FadeReach is Tinlance's outbound intelligence and revenue-execution platform. It combines account discovery, evidence-backed research, opportunity reasoning, controlled outbound execution, reply handling, deliverability controls, and revenue learning.
+
+## Canonical repository
+
+- Repository: https://github.com/LloydCoder/fadereach
+- Owner: Tinlance Limited
+- License: Proprietary; see LICENSE
+- Primary branch: main
+- Documentation index: docs/README.md
+
+## Product boundary
+
+FadeReach owns outbound intelligence, campaign control, tenant/application state, provider adapters, deliverability controls, audit semantics, outcomes, and revenue learning.
+
+It is not merely an email sender.
+
+TADS and SDEA are upstream intelligence/acquisition layers. FDSE/FDE is downstream engineering delivery. Tinlance Agent Platform and Tinlance Agent OS are separate governed execution/workspace systems; FadeReach integrates with them rather than duplicating their authority, policy, sandbox, secrets, audit, or runtime responsibilities.
+
+## Core loop
+
+Research → Reason → Reach → Learn
+
+- Research: accounts, people, technology, hiring, funding, expansion, product, and other observable signals.
+- Reason: ICP fit, why-now, buyer hypothesis, likely problem, offer/angle, evidence, and confidence.
+- Reach: campaigns, sequences, provider execution, webhooks, replies, and qualification.
+- Learn: replies, meetings, opportunities, revenue, and experiment outcomes.
+
+## Runtime
+
+- Backend: FastAPI, Python 3.12 baseline, PostgreSQL, Alembic, Redis/Valkey.
+- Frontend: React + Vite.
+- Execution adapters: Listmonk and n8n.
+- Deployment: Docker Compose, Nginx/Cloudflare, systemd on the current single-host path.
+- Durable execution: dedicated worker separated from the HTTP API.
+
+## Security model
+
+Tenant/resource authorization is server-side. PostgreSQL RLS is used where defined by the schema. Webhooks must authenticate and be idempotent. Secrets must remain outside source control. AI output is untrusted input unless an explicit governed execution path authorizes an action. High-risk outbound actions fail closed when required evidence or policy is absent.
+
+## Development
+
+Canonical local validation is described in README.md and CONTRIBUTING.md. The CI workflow is .github/workflows/ci.yml.
+
+## Documentation
+
+Start with docs/README.md, then consult:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY.md
+- docs/THREAT_MODEL.md
+- docs/DATA_MODEL.md
+- docs/API.md
+- docs/DEPLOYMENT.md
+- docs/OPERATIONS_RUNBOOK.md
+- docs/DISASTER_RECOVERY.md
+- docs/DELIVERABILITY.md
+- docs/COMPLIANCE.md
+- docs/PRODUCTION_READINESS.md
+- docs/PHASE_01_CANONICAL_REVENUE_MODEL.md through docs/PHASE_24_ENTERPRISE_GA.md
+
+## Important evidence boundary
+
+Green CI proves only the automated checks that actually ran. It does not prove production deployment, provider reputation, DNS/TLS, customer workload performance, legal compliance, or independent security assessment.

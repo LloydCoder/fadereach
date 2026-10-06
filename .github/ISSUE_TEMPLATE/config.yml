@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability reporting
+    url: https://github.com/LloydCoder/fadereach/security/advisories/new
+    about: Report suspected vulnerabilities privately. Do not use a public issue.
+  - name: Documentation
+    url: https://github.com/LloydCoder/fadereach/tree/main/docs
+    about: Read the authoritative engineering and operational documentation.

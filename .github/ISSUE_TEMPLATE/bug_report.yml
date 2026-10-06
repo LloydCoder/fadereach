@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a reproducible defect in FadeReach.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include credentials, API keys, customer data, private email content, or vulnerability exploit details.
+        For security vulnerabilities, use SECURITY.md instead.
+  - type: input
+    id: version
+    attributes:
+      label: Commit or release
+      description: Provide the FadeReach commit SHA, tag, or release.
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Give the smallest reproducible sequence and commands.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: OS, Python, Node, Docker, browser, provider, and other relevant versions.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Paste sanitized logs only. Remove secrets and personal/customer data.
