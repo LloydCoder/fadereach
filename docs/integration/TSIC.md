@@ -10,6 +10,8 @@ The acquisition path is:
 
 `World Intelligence → TADS → SDEA → ReconOS → FadeReach → Sales → FDSE`
 
+FadeReach consumes a qualified account/opportunity handoff; it does not reinterpret upstream intelligence as authorization. Signal, evidence, opportunity, tenant, consent/suppression, trace and economic-attribution references remain attached to every consequential outreach action.
+
 Every consequential outreach action must retain tenant, account/contact, campaign, signal/opportunity, request/correlation and economic-attribution context. Suppression/consent controls remain authoritative within FadeReach's outreach boundary.
 
 Passing the CI conformance gate proves compatibility with the reviewed TSIC adapter; it does not claim production deployment.
