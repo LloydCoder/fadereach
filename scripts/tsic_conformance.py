@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 from urllib.request import Request, urlopen
 
-TSIC_REVISION = "72c3664d7917bf9f8adb071713719589ff159972"
+TSIC_REVISION = "4c5b7d70c937ca8227ba8a9ebfe0d69b3e5c2bf8"
 RAW_ROOT = f"https://raw.githubusercontent.com/LloydCoder/tinlance-system-integration/{TSIC_REVISION}"
 REQUIRED = {"identity-context","event-envelope","delivery-semantics","trace-context","economic-attribution"}
 
