@@ -1,19 +1,19 @@
 # FadeReach Backend
 # Python 3.12
-fastapi==0.142.2
+fastapi==0.162.0
 uvicorn[standard]==0.54.0
-pydantic[email]==2.13.5
-asyncpg==0.31.0
+pydantic[email]==2.14.1
+asyncpg==0.32.0
 redis==8.1.0
 bcrypt==5.0.0
 httpx==0.28.1
-dnspython==2.8.0
+dnspython==2.9.0
 nanoid==2.0.0
 python-multipart==0.0.32
 python-dotenv==1.2.4
 PyJWT==2.15.1
-SQLAlchemy==2.0.36
-alembic==1.20.0
+SQLAlchemy==2.1.6
+alembic==1.20.1
 
 psycopg2-binary==2.9.13
 
